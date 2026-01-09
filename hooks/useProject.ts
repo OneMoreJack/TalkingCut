@@ -56,7 +56,7 @@ export const useProject = () => {
         videoPath,
         duration: result.segments.length > 0 ? result.segments[result.segments.length - 1].end : 0,
         segments: result.segments as any,
-        settings: { paddingStart: 0.1, paddingEnd: 0.1, minSilenceDuration: 0.5 }
+        settings: { paddingStart: 0.1, paddingEnd: 0.1, minSilenceDuration: 0.5, crossfadeDuration: 0.02 }
       });
       setStatus({ step: 'idle', progress: 100, message: 'Done' });
       setHistory([]);
@@ -65,6 +65,14 @@ export const useProject = () => {
       setStatus({ step: 'idle', progress: 0, message: `Error: ${result.error}` });
     }
   }, []);
+
+  const updateSettings = useCallback((newSettings: Partial<VideoProject['settings']>) => {
+    if (!project) return;
+    setProject({
+      ...project,
+      settings: { ...project.settings, ...newSettings }
+    });
+  }, [project]);
 
   const saveProject = useCallback(async () => {
     if (!project || !window.electronAPI) return;
@@ -145,6 +153,7 @@ export const useProject = () => {
     redo,
     canUndo: history.length > 0,
     canRedo: redoStack.length > 0,
-    updateDuration
+    updateDuration,
+    updateSettings
   };
 };

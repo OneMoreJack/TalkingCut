@@ -25,6 +25,7 @@ export interface VideoProject {
     paddingStart: number;
     paddingEnd: number;
     minSilenceDuration: number;
+    crossfadeDuration: number;
   };
 }
 

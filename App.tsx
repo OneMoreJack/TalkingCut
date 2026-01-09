@@ -9,10 +9,10 @@ import {
     Undo2
 } from 'lucide-react';
 import React, { useMemo, useRef, useState } from 'react';
+import Timeline from './components/Timeline';
 import WordEditor from './components/WordEditor';
 import { useProject } from './hooks/useProject';
-
-import Timeline from './components/Timeline';
+import { generateFFmpegCommand } from './services/ffmpegService';
 
 const App: React.FC = () => {
   const {
@@ -26,13 +26,31 @@ const App: React.FC = () => {
     redo,
     canUndo,
     canRedo,
-    updateDuration
+    updateDuration,
+    updateSettings
   } = useProject();
 
   const [currentTime, setCurrentTime] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const skipFlag = useRef(false);
+
+  // 1. Export Logic
+  const handleExport = async () => {
+    if (!project || !window.electronAPI) return;
+
+    const outputPath = await window.electronAPI.saveVideoDialog();
+    if (!outputPath) return;
+
+    const ffmpegCommand = generateFFmpegCommand(project, outputPath);
+    if (!ffmpegCommand) return;
+
+    await window.electronAPI.export.start({
+      videoPath: project.videoPath,
+      outputPath,
+      ffmpegCommand
+    });
+  };
 
   // ... (Virtual Preview and keyboard shortcuts logic remains same)
 
@@ -122,6 +140,15 @@ const App: React.FC = () => {
                     onChange={() => {}} 
                   />
                 </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span>Crossfade (s)</span>
+                  <input 
+                    type="number" step="0.01" min="0" max="1"
+                    className="w-16 bg-zinc-800 rounded px-2 py-1 outline-none focus:ring-1 ring-indigo-500"
+                    value={project.settings.crossfadeDuration}
+                    onChange={(e) => updateSettings({ crossfadeDuration: parseFloat(e.target.value) })}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -133,7 +160,7 @@ const App: React.FC = () => {
                   <span>Auto-Cut Silence & Fillers</span>
                 </button>
                 <button 
-                  onClick={() => {/* TODO: Export UI */}}
+                  onClick={handleExport}
                   className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 py-2 rounded-lg text-sm font-medium transition-colors"
                 >
                   <Download size={16} />

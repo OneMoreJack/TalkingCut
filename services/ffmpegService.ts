@@ -1,5 +1,5 @@
 
-import { WordSegment, VideoProject } from '../types';
+import { VideoProject } from '../types';
 
 /**
  * Calculates continuous kept segments from individual words.
@@ -28,7 +28,7 @@ export const generateCutList = (project: VideoProject) => {
         currentSegment = null;
       }
     }
-    
+
     // Last segment case
     if (index === segments.length - 1 && currentSegment) {
       cutPoints.push(applyPadding(currentSegment, paddingStart, paddingEnd, duration));
@@ -39,9 +39,9 @@ export const generateCutList = (project: VideoProject) => {
 };
 
 const applyPadding = (
-  seg: { start: number; end: number }, 
-  pStart: number, 
-  pEnd: number, 
+  seg: { start: number; end: number },
+  pStart: number,
+  pEnd: number,
   maxDuration: number
 ) => {
   return {
@@ -51,20 +51,42 @@ const applyPadding = (
 };
 
 /**
- * Generates an FFmpeg command to concat the segments.
- * For lossless fast cutting, we use a complex filter or a concat demuxer file.
+ * Generates an FFmpeg command to concat the segments with audio crossfades.
+ * Uses filter_complex for frame-accurate cutting and smooth audio transitions.
  */
 export const generateFFmpegCommand = (project: VideoProject, outputPath: string) => {
   const cuts = generateCutList(project);
-  
-  // Method 1: Filter Complex (Better for accuracy but requires re-encoding)
+  if (cuts.length === 0) return '';
+
+  const { crossfadeDuration } = project.settings;
+
+  // 1. Define Trim and SetPTS filters for each segment
   let filter = '';
   cuts.forEach((cut, i) => {
+    // Video part
     filter += `[0:v]trim=start=${cut.start}:end=${cut.end},setpts=PTS-STARTPTS[v${i}]; `;
+    // Audio part
     filter += `[0:a]atrim=start=${cut.start}:end=${cut.end},asetpts=PTS-STARTPTS[a${i}]; `;
   });
-  
-  const concatStr = cuts.map((_, i) => `[v${i}][a${i}]`).join('') + `concat=n=${cuts.length}:v=1:a=1[outv][outa]`;
-  
-  return `ffmpeg -i "${project.videoPath}" -filter_complex "${filter}${concatStr}" -map "[outv]" -map "[outa]" -c:v libx264 -preset superfast "${outputPath}"`;
+
+  // 2. Concat video segments (video is easy to concat)
+  const vConcatInput = cuts.map((_, i) => `[v${i}]`).join('');
+  filter += `${vConcatInput}concat=n=${cuts.length}:v=1:a=0[outv]; `;
+
+  // 3. Chain audio segments with crossfades
+  // acrossfade only works between two inputs, so we chain them.
+  // [a0][a1]acrossfade=d=0.02[ax1]; [ax1][a2]acrossfade=d=0.02[ax2]...
+  if (cuts.length === 1) {
+    filter += `[a0]copy[outa]`;
+  } else {
+    let lastAudio = '[a0]';
+    for (let i = 1; i < cuts.length; i++) {
+      const nextOutput = (i === cuts.length - 1) ? '[outa]' : `[ax${i}]`;
+      filter += `${lastAudio}[a${i}]acrossfade=d=${crossfadeDuration}:curve1=exp:curve2=exp${nextOutput}; `;
+      lastAudio = `[ax${i}]`;
+    }
+  }
+
+  // Final command
+  return `ffmpeg -i "${project.videoPath}" -filter_complex "${filter.trim()}" -map "[outv]" -map "[outa]" -c:v libx264 -preset superfast -c:a aac -b:a 192k "${outputPath}"`;
 };
