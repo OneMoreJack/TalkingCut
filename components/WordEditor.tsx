@@ -1,16 +1,17 @@
 
+import { RotateCcw, Trash2 } from 'lucide-react';
 import React from 'react';
-import { WordSegment, WordType } from '../types';
-import { Trash2, RotateCcw } from 'lucide-react';
+import { WordSegment, WordType } from '../types/index';
 
 interface WordEditorProps {
   segments: WordSegment[];
   currentTime: number;
   onToggleDelete: (id: string) => void;
   onWordClick: (time: number) => void;
+  searchTerm?: string;
 }
 
-const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggleDelete, onWordClick }) => {
+const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggleDelete, onWordClick, searchTerm }) => {
   return (
     <div className="p-8 max-w-5xl mx-auto leading-relaxed">
       <div className="flex flex-wrap gap-x-2 gap-y-4">
@@ -18,6 +19,7 @@ const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggle
           const isActive = currentTime >= word.start && currentTime < word.end;
           const isFiller = word.type === WordType.FILLER;
           const isSilence = word.type === WordType.SILENCE;
+          const isMatched = searchTerm && word.text.toLowerCase().includes(searchTerm.toLowerCase());
 
           return (
             <span
@@ -27,7 +29,8 @@ const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggle
                 relative group cursor-pointer text-xl px-1.5 py-1 rounded transition-all
                 ${word.deleted ? 'opacity-30 line-through grayscale text-zinc-600' : ''}
                 ${isActive ? 'bg-indigo-600 text-white scale-110 shadow-lg z-10' : ''}
-                ${!isActive && !word.deleted ? 'hover:bg-zinc-800' : ''}
+                ${!isActive && isMatched ? 'bg-yellow-500/20 ring-1 ring-yellow-500/50' : ''}
+                ${!isActive && !word.deleted && !isMatched ? 'hover:bg-zinc-800' : ''}
                 ${isFiller ? 'underline decoration-yellow-500/50 decoration-wavy' : ''}
                 ${isSilence ? 'text-zinc-500 italic text-sm border border-zinc-700/50 bg-zinc-800/20' : ''}
               `}

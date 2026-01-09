@@ -29,7 +29,7 @@ export interface VideoProject {
 }
 
 export interface ProcessingStatus {
-  step: 'idle' | 'transcribing' | 'aligning' | 'cutting' | 'exporting';
+  step: 'idle' | 'extracting' | 'transcribing' | 'aligning' | 'cutting' | 'exporting';
   progress: number;
   message: string;
 }

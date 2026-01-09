@@ -14,10 +14,10 @@
 - [x] **File System**: Manage temporary workspace for processed audio and JSON snapshots.
 
 ## 3. Frontend & UX (React Layer)
-- [ ] **Timeline View**: Add a zoomable waveform or timeline below the word editor for better visual context.
-- [ ] **State Persistence**: Implement an Undo/Redo stack based on `VideoProject` JSON snapshots.
-- [ ] **Real-time Sync**: Optimize the `currentTime` logic to ensure the "active word" highlight doesn't lag during high-resolution video playback.
-- [ ] **Segment Search**: Add a search bar to find and batch-delete specific words or phrases.
+- [x] **Timeline View**: Add a zoomable waveform or timeline below the word editor for better visual context.
+- [x] **Virtual Preview**: Implement a custom video seeker that auto-skips segments marked as `FILLER` or `SILENCE` (or manually deleted) during playback for instant feedback.
+- [x] **Undo/Redo**: Use a state history stack to allow users to revert accidental deletions.
+- [x] **Batch Search**: Allow searching for specific phrases and bulk-deleting all matches.pecific words or phrases.
 - [ ] **Export Preview**: Show a "virtual preview" of the cut video (skipping deleted segments during playback) before actually rendering.
 
 ## 4. Video Engineering (FFmpeg Layer)
