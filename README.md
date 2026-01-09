@@ -44,5 +44,27 @@ To contribute or run locally, ensure you have:
 - Python (3.10+)
 - FFmpeg installed in your PATH
 
+### Python Environment Setup
+
+```bash
+cd python
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### Running the Transcription Engine
+
+```bash
+# Basic usage
+python transcribe.py --input /path/to/video.mp4 --output result.json
+
+# With options
+python transcribe.py -i video.mp4 -o result.json --model base --language zh
+
+# Run tests
+python test_transcribe.py
+```
+
 ---
 *Created with ❤️ by the TalkingCut Team.*

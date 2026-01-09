@@ -1,0 +1,15 @@
+# TalkingCut Python Dependencies
+# ===============================
+# Install with: pip install -r requirements.txt
+
+# WhisperX for transcription and word-level alignment
+whisperx>=3.1.1
+
+# PyTorch for ML inference (will auto-select correct version for your platform)
+torch>=2.0
+
+# Silero VAD for voice activity detection
+silero-vad>=5.0
+
+# Additional dependencies (usually installed automatically)
+torchaudio>=2.0
