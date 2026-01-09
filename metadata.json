@@ -1,0 +1,8 @@
+{
+  "name": "TalkingCut",
+  "description": "Text-driven video editing application using Electron, WhisperX, and FFmpeg. Cut videos as easily as editing a text document.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
