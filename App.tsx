@@ -8,7 +8,7 @@ import {
   Trash2,
   Undo2
 } from 'lucide-react';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ModelSelector from './components/ModelSelector';
 import Timeline from './components/Timeline';
 import WordEditor from './components/WordEditor';
@@ -68,6 +68,42 @@ const App: React.FC = () => {
       s.text.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [project, searchTerm]);
+
+  // Video source state for Electron-safe playback
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+
+  // Convert video file to Blob URL for safe playback in Electron
+  useEffect(() => {
+    if (!project) {
+      setVideoSrc(null);
+      return;
+    }
+
+    // Read the video file and create a Blob URL
+    const loadVideo = async () => {
+      try {
+        const buffer = await window.electronAPI.readVideoFile(project.videoPath);
+        if (!buffer) {
+          throw new Error('Failed to read video file');
+        }
+        const blob = new Blob([buffer], { type: 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+        setVideoSrc(url);
+      } catch (error) {
+        console.error('[App] Failed to load video:', error);
+        setVideoSrc(null);
+      }
+    };
+
+    loadVideo();
+
+    // Cleanup: revoke the Blob URL when component unmounts or project changes
+    return () => {
+      if (videoSrc) {
+        URL.revokeObjectURL(videoSrc);
+      }
+    };
+  }, [project?.id]);
 
   // Handle word and timeline clicks
   const handleJumpToTime = (time: number) => {
@@ -234,7 +270,7 @@ const App: React.FC = () => {
               <div className="w-full max-w-4xl aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl relative group">
                 <video 
                   ref={videoRef}
-                  src={`file://${project.videoPath}`}
+                  src={videoSrc || undefined}
                   className="w-full h-full object-contain"
                   onLoadedMetadata={handleLoadedMetadata}
                   onClick={() => videoRef.current?.paused ? videoRef.current.play() : videoRef.current?.pause()}

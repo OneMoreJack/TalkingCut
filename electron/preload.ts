@@ -65,6 +65,9 @@ const electronAPI = {
   saveVideoDialog: (): Promise<string | null> =>
     ipcRenderer.invoke('dialog:saveVideo'),
 
+  readVideoFile: (videoPath: string): Promise<ArrayBuffer | null> =>
+    ipcRenderer.invoke('file:readVideo', videoPath),
+
   // ----- Transcription -----
   transcribe: {
     start: (videoPath: string, options?: { model?: string; language?: string }): Promise<TranscribeResult> =>

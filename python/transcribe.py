@@ -10,17 +10,19 @@ This module provides word-level transcription using WhisperX, with:
 - Structured JSON output compatible with the frontend WordSegment interface
 """
 
+# Force PyTorch 2.6+ to use the old loading behavior (weights_only=False by default)
+# This is necessary for WhisperX/SileroVAD which use omegaconf in their checkpoints
+import os
+os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
+
+# Selective imports to speed up initial boot feedback
 import argparse
 import json
 import os
 import sys
 import uuid
 from pathlib import Path
-from typing import Literal
-
-import torch
-import whisperx
-from silero_vad import load_silero_vad, get_speech_timestamps, read_audio
+from typing import Literal, Any
 
 # ============================================================================
 # Configuration
@@ -44,21 +46,34 @@ MIN_SILENCE_DURATION = 0.5
 # Device detection
 def get_device() -> str:
     """Detect the best available device for inference."""
-    if torch.backends.mps.is_available():
-        return "mps"
-    elif torch.cuda.is_available():
+    import torch
+    import sys
+    
+    # NOTE: As of now, WhisperX's underlying faster-whisper/ctransformers 
+    # does not reliably support 'mps' (Metal Performance Shaders).
+    # We default to 'cpu' on macOS for stability, which is still very fast on Apple Silicon.
+    if sys.platform == "darwin":
+        return "cpu"
+        
+    if torch.cuda.is_available():
         return "cuda"
+        
     return "cpu"
 
 def get_compute_type(device: str) -> str:
     """Get appropriate compute type for the device."""
     if device == "cuda":
         return "float16"
-    elif device == "mps":
-        # MPS works best with float32 for stability
-        return "float32"
+    # For CPU (including Mac), int8 provides 2-4x speedup with minimal accuracy loss
     return "int8"
 
+
+def get_optimal_threads() -> int:
+    """Get optimal thread count for CPU inference on Mac."""
+    import os
+    cpu_count = os.cpu_count() or 4
+    # Use 80% of cores for transcription, leaving headroom for UI
+    return max(1, int(cpu_count * 0.8))
 
 # ============================================================================
 # Filler Word Detection
@@ -85,6 +100,7 @@ def detect_silences(audio_path: str, min_duration: float = MIN_SILENCE_DURATION)
     
     Returns a list of silence segments with start/end times.
     """
+    from silero_vad import load_silero_vad, get_speech_timestamps, read_audio
     model = load_silero_vad()
     wav = read_audio(audio_path)
     
@@ -140,15 +156,28 @@ def transcribe_audio(
     Returns:
         List of word segments with timing and type information
     """
-    # Setup device
+    # Setup device and performance settings
+    import torch
+    import whisperx
+    import time
+    import gc
+    
+    start_time = time.time()
+    
     if device is None:
         device = get_device()
     compute_type = get_compute_type(device)
+    threads = get_optimal_threads()
+    
+    # Set threading via environment variable (more reliable than kwargs)
+    os.environ["OMP_NUM_THREADS"] = str(threads)
+    os.environ["MKL_NUM_THREADS"] = str(threads)
     
     print(f"[TalkingCut] Using device: {device} with compute_type: {compute_type}")
+    print(f"[TalkingCut] CPU threads: {threads}")
     print(f"[TalkingCut] Loading model: {model_size}")
     
-    # Load WhisperX model
+    # Load WhisperX model with optimizations
     model = whisperx.load_model(
         model_size,
         device=device,
@@ -156,27 +185,36 @@ def transcribe_audio(
         language=language
     )
     
+    load_time = time.time() - start_time
+    print(f"[TalkingCut] Model loaded in {load_time:.2f}s")
+    
     # Load audio
     print(f"[TalkingCut] Loading audio: {audio_path}")
     audio = whisperx.load_audio(audio_path)
     
-    # Transcribe
+    # Transcribe with performance tracking
     print("[TalkingCut] Transcribing...")
+    transcribe_start = time.time()
     result = model.transcribe(audio, batch_size=batch_size)
+    transcribe_time = time.time() - transcribe_start
+    print(f"[TalkingCut] Transcription completed in {transcribe_time:.2f}s")
     
     # Detect language if not specified
     detected_language = result.get("language", language or "en")
     print(f"[TalkingCut] Detected language: {detected_language}")
     
-    # Load alignment model
+    # Load alignment model with optimizations
     print("[TalkingCut] Loading alignment model...")
+    align_load_start = time.time()
     model_a, metadata = whisperx.load_align_model(
         language_code=detected_language,
         device=device
     )
+    print(f"[TalkingCut] Alignment model loaded in {time.time() - align_load_start:.2f}s")
     
-    # Align
+    # Align with performance tracking
     print("[TalkingCut] Aligning words...")
+    align_start = time.time()
     aligned = whisperx.align(
         result["segments"],
         model_a,
@@ -185,6 +223,8 @@ def transcribe_audio(
         device,
         return_char_alignments=False
     )
+    align_time = time.time() - align_start
+    print(f"[TalkingCut] Alignment completed in {align_time:.2f}s")
     
     # Process segments
     segments = []
@@ -228,7 +268,22 @@ def transcribe_audio(
     # Sort all segments by start time
     segments.sort(key=lambda x: x["start"])
     
+    # Cleanup models to free memory
+    del model
+    del model_a
+    gc.collect()
+    if device == "cuda":
+        torch.cuda.empty_cache()
+    
+    total_time = time.time() - start_time
+    audio_duration = len(audio) / 16000  # 16kHz sample rate
+    rtf = total_time / audio_duration if audio_duration > 0 else 0
+    
     print(f"[TalkingCut] Found {len(segments)} segments")
+    print(f"[TalkingCut] Total processing time: {total_time:.2f}s")
+    print(f"[TalkingCut] Real-time factor (RTF): {rtf:.2f}x")
+    print(f"[TalkingCut] Audio duration: {audio_duration:.2f}s")
+    
     return segments
 
 
@@ -279,6 +334,9 @@ def main():
     )
     
     args = parser.parse_args()
+    
+    print("[TalkingCut] Python engine started")
+    print("[TalkingCut] Loading AI libraries...")
     
     # Validate input file
     if not os.path.exists(args.input):

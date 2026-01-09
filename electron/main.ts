@@ -92,6 +92,17 @@ function setupIpcHandlers(): void {
     return result.canceled ? null : result.filePath;
   });
 
+  ipcMain.handle('file:readVideo', async (_event, videoPath: string) => {
+    try {
+      const fs = await import('fs/promises');
+      const buffer = await fs.readFile(videoPath);
+      return buffer;
+    } catch (error) {
+      console.error('[Main] Failed to read video file:', error);
+      return null;
+    }
+  });
+
   // ----- Transcription -----
   ipcMain.handle('transcribe:start', async (event, videoPath: string, options?: {
     model?: string;
@@ -105,6 +116,13 @@ function setupIpcHandlers(): void {
           progress,
           message: 'Extracting audio...'
         });
+      });
+
+      // Notify UI that we are transitioning to transcription
+      event.sender.send('transcribe:progress', {
+        step: 'transcribing',
+        progress: 0,
+        message: 'Initializing AI engine (loading models)...'
       });
 
       // Run Python transcription
