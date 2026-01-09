@@ -22,3 +22,26 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python
+python/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Electron / Build
+dist-electron/
+release/
+*.partial
+*.progress
+
+# Local Env
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ProcessingStatus, VideoProject, WordSegment, WordType } from '../types/index';
 
+export type ModelSize = 'tiny' | 'base' | 'small' | 'medium' | 'large-v3-turbo';
+
 export const useProject = () => {
   const [project, setProject] = useState<VideoProject | null>(null);
   const [status, setStatus] = useState<ProcessingStatus>({ step: 'idle', progress: 0, message: '' });
   const [history, setHistory] = useState<WordSegment[][]>([]);
   const [redoStack, setRedoStack] = useState<WordSegment[][]>([]);
+  const [modelSize, setModelSize] = useState<ModelSize>('base');
 
   // 1. Electron IPC Listeners
   useEffect(() => {
     if (!window.electronAPI) return;
 
     const removeTranscribeListener = window.electronAPI.transcribe.onProgress((data) => {
+      console.log('[useProject] Progress:', data);
       setStatus({
         step: data.step as any,
         progress: data.progress,
@@ -35,36 +39,48 @@ export const useProject = () => {
 
   // 2. Project Actions
   const openVideo = useCallback(async () => {
-    if (!window.electronAPI) return;
-
-    const videoPath = await window.electronAPI.openVideoDialog();
-    if (!videoPath) return;
-
-    setStatus({ step: 'extracting', progress: 0, message: 'Starting transcription...' });
-
-    const result = await window.electronAPI.transcribe.start(videoPath);
-
-    if (result.success && result.segments) {
-      const name = videoPath.split(/[\\/]/).pop() || 'Untitled';
-
-      // We need duration from electron if possible, but for now we can estimate or wait for video load
-      // Ideally transcribe:start should return duration too
-
-      setProject({
-        id: Math.random().toString(36).substr(2, 9),
-        name,
-        videoPath,
-        duration: result.segments.length > 0 ? result.segments[result.segments.length - 1].end : 0,
-        segments: result.segments as any,
-        settings: { paddingStart: 0.1, paddingEnd: 0.1, minSilenceDuration: 0.5, crossfadeDuration: 0.02 }
-      });
-      setStatus({ step: 'idle', progress: 100, message: 'Done' });
-      setHistory([]);
-      setRedoStack([]);
-    } else {
-      setStatus({ step: 'idle', progress: 0, message: `Error: ${result.error}` });
+    if (!window.electronAPI) {
+      console.error('[useProject] electronAPI not available');
+      return;
     }
-  }, []);
+
+    try {
+      const videoPath = await window.electronAPI.openVideoDialog();
+      if (!videoPath) return;
+
+      console.log('[useProject] Starting transcription for:', videoPath);
+      setStatus({ step: 'extracting', progress: 0, message: 'Starting transcription...' });
+
+      const result = await window.electronAPI.transcribe.start(videoPath, {
+        model: modelSize,
+        language: undefined // Auto-detect
+      });
+
+      console.log('[useProject] Transcription result:', result);
+
+      if (result.success && result.segments) {
+        const name = videoPath.split(/[\\/]/).pop() || 'Untitled';
+
+        setProject({
+          id: Math.random().toString(36).substr(2, 9),
+          name,
+          videoPath,
+          duration: result.segments.length > 0 ? result.segments[result.segments.length - 1].end : 0,
+          segments: result.segments as any,
+          settings: { paddingStart: 0.1, paddingEnd: 0.1, minSilenceDuration: 0.5, crossfadeDuration: 0.02 }
+        });
+        setStatus({ step: 'idle', progress: 100, message: 'Done' });
+        setHistory([]);
+        setRedoStack([]);
+      } else {
+        console.error('[useProject] Transcription failed:', result.error);
+        setStatus({ step: 'idle', progress: 0, message: `Error: ${result.error}` });
+      }
+    } catch (error) {
+      console.error('[useProject] Exception during transcription:', error);
+      setStatus({ step: 'idle', progress: 0, message: `Error: ${(error as Error).message}` });
+    }
+  }, [modelSize]);
 
   const updateSettings = useCallback((newSettings: Partial<VideoProject['settings']>) => {
     if (!project) return;
@@ -154,6 +170,8 @@ export const useProject = () => {
     canUndo: history.length > 0,
     canRedo: redoStack.length > 0,
     updateDuration,
-    updateSettings
+    updateSettings,
+    modelSize,
+    setModelSize
   };
 };

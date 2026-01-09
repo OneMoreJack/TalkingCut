@@ -11,8 +11,11 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getModelById, MODEL_DEFINITIONS } from './models/modelDefinitions';
+import { DownloadManager } from './services/downloadManager';
 import { FFmpegBridge } from './services/ffmpegBridge';
 import { FileManager } from './services/fileManager';
+import { ModelManager } from './services/modelManager';
 import { PythonBridge } from './services/pythonBridge';
 
 // ESM compatibility: create __dirname equivalent
@@ -26,6 +29,8 @@ let mainWindow: BrowserWindow | null = null;
 const pythonBridge = new PythonBridge();
 const ffmpegBridge = new FFmpegBridge();
 const fileManager = new FileManager();
+const modelManager = new ModelManager();
+const downloadManager = new DownloadManager(modelManager.getModelsDir());
 
 // ============================================================================
 // Window Management
@@ -187,6 +192,43 @@ function setupIpcHandlers(): void {
     await fileManager.cleanupWorkspace();
     return { success: true };
   });
+
+  // ----- Model Management -----
+  ipcMain.handle('model:list', async () => {
+    const statuses = await modelManager.listModels();
+    return {
+      definitions: MODEL_DEFINITIONS,
+      statuses
+    };
+  });
+
+  ipcMain.handle('model:download', async (_event, modelId: string) => {
+    const model = getModelById(modelId);
+    if (!model) {
+      return { success: false, error: 'Model not found' };
+    }
+
+    try {
+      await downloadManager.downloadModel(model);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  ipcMain.handle('model:cancel', () => {
+    downloadManager.cancelDownload();
+    return { success: true };
+  });
+
+  ipcMain.handle('model:delete', async (_event, modelId: string) => {
+    try {
+      await modelManager.deleteModel(modelId);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
 }
 
 // ============================================================================
@@ -196,6 +238,11 @@ function setupIpcHandlers(): void {
 app.whenReady().then(() => {
   setupIpcHandlers();
   createWindow();
+
+  // Set main window reference for progress events
+  if (mainWindow) {
+    downloadManager.setMainWindow(mainWindow);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

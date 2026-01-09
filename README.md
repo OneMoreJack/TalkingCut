@@ -37,34 +37,51 @@ This project is currently in active development. We are focusing on refining the
 Check out the full development plan here:
 👉 [**View the Development TODO List**](./todo.md)
 
-## 🛠️ Development
+## 🛠️ Local Development
 
-To contribute or run locally, ensure you have:
-- Node.js (v18+)
-- Python (3.10+)
-- FFmpeg installed in your PATH
+Follow these steps to set up the development environment on your machine.
 
-### Python Environment Setup
+### 📋 Prerequisites
 
+- **Node.js**: v18 or later
+- **pnpm**: `npm install -g pnpm`
+- **Python**: 3.11 or later
+- **FFmpeg**: Must be available in your system `PATH`.
+  - macOS: `brew install ffmpeg`
+  - Windows: `choco install ffmpeg`
+
+### ⚙️ Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/one-more/talkingcut.git
+   cd talkingcut
+   ```
+
+2. **Install Node.js dependencies**:
+   ```bash
+   pnpm install
+   ```
+
+3. **Set up Python Virtual Environment**:
+   This step installs the AI engine (WhisperX, PyTorch, etc.). This may take several minutes as it downloads large machine learning libraries.
+   ```bash
+   pnpm run python:setup
+   ```
+
+### 🚀 Running the App
+
+Start the Electron app in development mode:
 ```bash
-cd python
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+pnpm run electron:dev
 ```
 
-### Running the Transcription Engine
+### 📥 Model Management
 
-```bash
-# Basic usage
-python transcribe.py --input /path/to/video.mp4 --output result.json
-
-# With options
-python transcribe.py -i video.mp4 -o result.json --model base --language zh
-
-# Run tests
-python test_transcribe.py
-```
+When the app opens:
+1. Select a model size (e.g., **Tiny** or **Base**) from the sidebar.
+2. Click the **"Not Cached"** badge or simply click **"Open Video File"**—the app will automatically download the required model weights to your local storage.
+3. Once the badge turns green (**Cached**), you're ready to transcribe!
 
 ---
 *Created with ❤️ by the TalkingCut Team.*

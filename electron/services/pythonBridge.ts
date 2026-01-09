@@ -60,7 +60,8 @@ export class PythonBridge {
       try {
         if (fs.existsSync(p)) {
           this.pythonPath = p;
-          console.log(`[PythonBridge] Found Python at: ${p}`);
+          const isVenv = p.includes(path.join('python', 'venv'));
+          console.log(`[PythonBridge] Found Python at: ${p} (${isVenv ? 'VENV' : 'SYSTEM'})`);
           return;
         }
       } catch {
@@ -158,7 +159,13 @@ export class PythonBridge {
         this.currentProcess = null;
 
         if (code !== 0) {
-          reject(new Error(`Python process exited with code ${code}: ${stderrBuffer}`));
+          let errorMessage = stderrBuffer;
+          if (stderrBuffer.includes('ModuleNotFoundError') || stderrBuffer.includes('No module named')) {
+            errorMessage = `Missing Python dependencies. Please run 'pnpm run python:setup' in your terminal.\n\nDetails: ${stderrBuffer}`;
+          } else if (!this.pythonPath?.includes('venv')) {
+            errorMessage = `Python virtual environment not found or incomplete. Try running 'pnpm run python:setup'.\n\nDetails: ${stderrBuffer}`;
+          }
+          reject(new Error(`Python process exited with code ${code}: ${errorMessage}`));
           return;
         }
 

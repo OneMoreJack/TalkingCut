@@ -1,17 +1,19 @@
 import {
-    Download,
-    FileVideo,
-    Play,
-    Redo2,
-    Scissors,
-    Search,
-    Trash2,
-    Undo2
+  Download,
+  FileVideo,
+  Play,
+  Redo2,
+  Scissors,
+  Search,
+  Trash2,
+  Undo2
 } from 'lucide-react';
 import React, { useMemo, useRef, useState } from 'react';
+import ModelSelector from './components/ModelSelector';
 import Timeline from './components/Timeline';
 import WordEditor from './components/WordEditor';
-import { useProject } from './hooks/useProject';
+import { useModelDownload } from './hooks/useModelDownload';
+import { ModelSize, useProject } from './hooks/useProject';
 import { generateFFmpegCommand } from './services/ffmpegService';
 
 const App: React.FC = () => {
@@ -27,8 +29,12 @@ const App: React.FC = () => {
     canUndo,
     canRedo,
     updateDuration,
-    updateSettings
+    updateSettings,
+    modelSize,
+    setModelSize
   } = useProject();
+
+  const modelDownload = useModelDownload();
 
   const [currentTime, setCurrentTime] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
@@ -105,16 +111,48 @@ const App: React.FC = () => {
         </div>
 
         <div className="space-y-4">
+          {/* Model Selector with Download Status */}
+          <div className="block">
+            <span className="text-xs uppercase font-semibold text-zinc-500 mb-2 block">AI Model</span>
+            <div className="space-y-4">
+              <ModelSelector
+                currentModelId={modelSize}
+                onSelect={(id) => setModelSize(id as ModelSize)}
+                models={modelDownload.models}
+                downloadProgress={modelDownload.downloadProgress}
+                onDownload={modelDownload.downloadModel}
+                onCancel={modelDownload.cancelDownload}
+                isDownloading={modelDownload.isDownloading}
+              />
+            </div>
+          </div>
+
+          {/* Open Video */}
           <div className="block">
             <span className="text-xs uppercase font-semibold text-zinc-500 mb-2 block">Project</span>
             <div 
-              onClick={openVideo}
+              onClick={async () => {
+                const isInstalled = modelDownload.isModelInstalled(modelSize);
+                if (!isInstalled) {
+                  // Automatically start download if not installed
+                  if (!modelDownload.isDownloading) {
+                    await modelDownload.downloadModel(modelSize);
+                  }
+                  return;
+                }
+                openVideo();
+              }}
               className="relative group cursor-pointer border-2 border-dashed border-zinc-700 rounded-xl p-6 hover:border-indigo-500 transition-colors flex flex-col items-center"
             >
               <FileVideo className="text-zinc-500 group-hover:text-indigo-400 mb-2" />
               <p className="text-xs text-center text-zinc-400">
                 {project ? project.name : 'Open Video File'}
               </p>
+              {!modelDownload.isModelInstalled(modelSize) && (
+                <div className="mt-2 px-2 py-0.5 bg-indigo-500/20 text-indigo-400 text-[10px] rounded-full animate-pulse font-medium">
+                  {modelDownload.isDownloading ? 'Downloading model...' : 'Model download required'}
+                </div>
+              )}
             </div>
           </div>
 

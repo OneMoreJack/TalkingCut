@@ -108,6 +108,37 @@ const electronAPI = {
 
     cleanup: (): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('temp:cleanup')
+  },
+
+  // ----- Model Management -----
+  model: {
+    list: (): Promise<{ definitions: any[]; statuses: any[] }> =>
+      ipcRenderer.invoke('model:list'),
+
+    download: (modelId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('model:download', modelId),
+
+    cancel: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('model:cancel'),
+
+    delete: (modelId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('model:delete', modelId),
+
+    onDownloadProgress: (callback: (progress: {
+      modelId: string;
+      fileName: string;
+      downloaded: number;
+      total: number;
+      percent: number;
+      speed: number;
+      eta: number;
+      status: 'downloading' | 'paused' | 'completed' | 'error';
+      error?: string;
+    }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: any) => callback(data);
+      ipcRenderer.on('model:downloadProgress', handler);
+      return () => ipcRenderer.removeListener('model:downloadProgress', handler);
+    }
   }
 };
 

@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "electron:dev": "vite --mode electron",
     "electron:build": "vite build && electron-builder",
-    "electron:preview": "vite build && electron ."
+    "electron:preview": "vite build && electron .",
+    "python:setup": "cd python && python3 -m venv venv && ./venv/bin/pip install --upgrade pip && ./venv/bin/pip install -r requirements.txt"
   },
   "dependencies": {
     "lucide-react": "^0.562.0",
