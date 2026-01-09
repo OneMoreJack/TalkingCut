@@ -8,11 +8,16 @@
  * - Native file system access
  */
 
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'path';
-import { PythonBridge } from './services/pythonBridge';
+import { fileURLToPath } from 'url';
 import { FFmpegBridge } from './services/ffmpegBridge';
 import { FileManager } from './services/fileManager';
+import { PythonBridge } from './services/pythonBridge';
+
+// ESM compatibility: create __dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Keep a reference to prevent garbage collection
 let mainWindow: BrowserWindow | null = null;
@@ -90,10 +95,10 @@ function setupIpcHandlers(): void {
     try {
       // Extract audio first (if needed)
       const audioPath = await ffmpegBridge.extractAudio(videoPath, (progress) => {
-        event.sender.send('transcribe:progress', { 
-          step: 'extracting', 
+        event.sender.send('transcribe:progress', {
+          step: 'extracting',
           progress,
-          message: 'Extracting audio...' 
+          message: 'Extracting audio...'
         });
       });
 
@@ -102,10 +107,10 @@ function setupIpcHandlers(): void {
         model: options?.model || 'base',
         language: options?.language,
         onProgress: (progress, message) => {
-          event.sender.send('transcribe:progress', { 
-            step: 'transcribing', 
+          event.sender.send('transcribe:progress', {
+            step: 'transcribing',
             progress,
-            message 
+            message
           });
         }
       });
@@ -129,10 +134,10 @@ function setupIpcHandlers(): void {
   }) => {
     try {
       await ffmpegBridge.executeCommand(params.ffmpegCommand, (progress) => {
-        event.sender.send('export:progress', { 
-          step: 'exporting', 
+        event.sender.send('export:progress', {
+          step: 'exporting',
           progress,
-          message: `Exporting... ${Math.round(progress)}%` 
+          message: `Exporting... ${Math.round(progress)}%`
         });
       });
 
@@ -150,7 +155,7 @@ function setupIpcHandlers(): void {
       }).then(r => r.filePath);
 
       if (!savePath) return { success: false, error: 'Cancelled' };
-      
+
       await fileManager.saveProject(savePath, projectData);
       return { success: true, path: savePath };
     } catch (error) {
@@ -165,7 +170,7 @@ function setupIpcHandlers(): void {
       });
 
       if (result.canceled) return { success: false, error: 'Cancelled' };
-      
+
       const data = await fileManager.loadProject(result.filePaths[0]);
       return { success: true, data, path: result.filePaths[0] };
     } catch (error) {
