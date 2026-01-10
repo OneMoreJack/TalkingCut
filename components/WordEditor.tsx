@@ -7,12 +7,13 @@ interface WordEditorProps {
   segments: WordSegment[];
   currentTime: number;
   onToggleDelete: (id: string) => void;
+  onToggleWordsDelete: (ids: string[]) => void;
   onWordClick: (time: number) => void;
   searchTerm?: string;
 }
 
-const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggleDelete, onWordClick, searchTerm }) => {
-  // --- Grouping Logic ---
+const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggleDelete, onToggleWordsDelete, onWordClick, searchTerm }) => {
+  // ... (Grouping Logic remains same)
   const sentences = useMemo(() => {
     const groups: WordSegment[][] = [];
     let currentGroup: WordSegment[] = [];
@@ -45,21 +46,30 @@ const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggle
   };
 
   return (
-    <div className="p-8 max-w-5xl mx-auto leading-relaxed space-y-8">
+    <div className="p-8 max-w-5xl mx-auto leading-relaxed space-y-6">
       {sentences.map((sentence, sIdx) => {
         const startTime = sentence[0]?.start ?? 0;
+        const sentenceIds = sentence.map(w => w.id);
+        const allDeleted = sentence.every(w => w.deleted);
         
         return (
-          <div key={`s-${sIdx}`} className="flex group/sentence">
-            {/* Sentence Timestamp */}
-            <div className="w-16 flex-shrink-0 pt-1.5">
-              <span className="text-xs font-mono text-zinc-500 bg-zinc-800/50 px-1.5 py-0.5 rounded opacity-0 group-hover/sentence:opacity-100 transition-opacity">
+          <div key={`s-${sIdx}`} className="flex flex-col group/sentence space-y-2">
+            {/* Sentence Header (Timestamp & Delete) */}
+            <div className="flex items-center space-x-3">
+              <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800/50 px-1.5 py-0.5 rounded">
                 {formatTime(startTime)}
               </span>
+              <button 
+                onClick={() => onToggleWordsDelete(sentenceIds)}
+                className="opacity-0 group-hover/sentence:opacity-100 transition-opacity p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-400"
+                title={allDeleted ? "Restore Sentence" : "Delete Sentence"}
+              >
+                {allDeleted ? <RotateCcw size={12} /> : <Trash2 size={12} />}
+              </button>
             </div>
 
             {/* Sentence Content */}
-            <div className="flex flex-wrap gap-x-1.5 gap-y-2">
+            <div className="flex flex-wrap gap-x-1 gap-y-1.5">
               {sentence.map((word) => {
                 const isActive = currentTime >= word.start && currentTime < word.end;
                 const isFiller = word.type === WordType.FILLER;
@@ -71,7 +81,7 @@ const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggle
                     key={word.id}
                     onClick={() => onWordClick(word.start)}
                     className={`
-                      relative group/word cursor-pointer text-xl px-1 py-0.5 rounded transition-all
+                      relative group/word cursor-pointer text-base px-1 py-0.5 rounded transition-all
                       ${word.deleted ? 'opacity-30 line-through grayscale text-zinc-600' : ''}
                       ${isActive ? 'bg-indigo-600 text-white shadow-md z-10' : ''}
                       ${!isActive && isMatched ? 'bg-yellow-500/20 ring-1 ring-yellow-500/50' : ''}

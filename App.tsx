@@ -23,6 +23,7 @@ const App: React.FC = () => {
     openVideo,
     saveProject,
     toggleWordDelete,
+    toggleWordsDelete,
     deleteFillers,
     undo,
     redo,
@@ -262,18 +263,52 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col relative bg-black">
-        {/* Video Preview */}
-        <div className="flex-1 flex flex-col bg-zinc-950">
+      <main className="flex-1 flex flex-row relative bg-black overflow-hidden">
+        {/* Text-Based Editor Section (Left) */}
+        <div className="w-1/2 min-w-[320px] bg-zinc-900 border-r border-zinc-800 flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+            <h2 className="text-sm font-semibold text-zinc-400">Transcript</h2>
+            <div className="flex items-center bg-zinc-800 rounded-md px-3 py-1.5 w-64">
+              <Search size={14} className="text-zinc-500 mr-2" />
+              <input 
+                type="text" 
+                placeholder="Search words..."
+                className="bg-transparent border-none outline-none text-xs w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {project && (
+              <WordEditor 
+                segments={project.segments} 
+                currentTime={currentTime}
+                onToggleDelete={toggleWordDelete}
+                onToggleWordsDelete={toggleWordsDelete}
+                onWordClick={handleJumpToTime}
+                searchTerm={searchTerm}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Video Preview & Timeline (Right) */}
+        <div className="flex-1 flex flex-col bg-zinc-950 overflow-hidden">
           <div className="flex-1 flex items-center justify-center p-8 overflow-hidden">
             {project ? (
-              <div className="w-full max-w-4xl aspect-video rounded-2xl overflow-hidden bg-black shadow-2xl relative group">
+              <div className="w-full h-full max-w-5xl rounded-2xl overflow-hidden bg-black shadow-2xl relative group">
                 <video 
                   ref={videoRef}
                   src={videoSrc || undefined}
                   className="w-full h-full object-contain"
                   onLoadedMetadata={handleLoadedMetadata}
                   onClick={() => videoRef.current?.paused ? videoRef.current.play() : videoRef.current?.pause()}
+                  onTimeUpdate={() => {
+                     if (!skipFlag.current) {
+                        setCurrentTime(videoRef.current?.currentTime || 0);
+                     }
+                  }}
                 />
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="flex items-center space-x-4">
@@ -311,34 +346,6 @@ const App: React.FC = () => {
               onTimeClick={handleJumpToTime}
             />
           )}
-        </div>
-
-        {/* Text-Based Editor Section */}
-        <div className="h-1/2 bg-zinc-900 border-t border-zinc-800 flex flex-col">
-          <div className="flex items-center justify-between px-8 py-4 border-b border-zinc-800">
-            <h2 className="text-sm font-semibold text-zinc-400">Transcript</h2>
-            <div className="flex items-center bg-zinc-800 rounded-md px-3 py-1.5 w-64">
-              <Search size={14} className="text-zinc-500 mr-2" />
-              <input 
-                type="text" 
-                placeholder="Search words..."
-                className="bg-transparent border-none outline-none text-xs w-full"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {project && (
-              <WordEditor 
-                segments={project.segments} 
-                currentTime={currentTime}
-                onToggleDelete={toggleWordDelete}
-                onWordClick={handleJumpToTime}
-                searchTerm={searchTerm}
-              />
-            )}
-          </div>
         </div>
       </main>
     </div>

@@ -110,6 +110,19 @@ export const useProject = () => {
     });
   }, [project]);
 
+  const toggleWordsDelete = useCallback((ids: string[]) => {
+    if (!project) return;
+
+    // Save to history before change
+    setHistory(prev => [...prev, project.segments]);
+    setRedoStack([]);
+
+    setProject({
+      ...project,
+      segments: project.segments.map(s => ids.includes(s.id) ? { ...s, deleted: !s.deleted } : s)
+    });
+  }, [project]);
+
   const deleteFillers = useCallback(() => {
     if (!project) return;
 
@@ -164,6 +177,7 @@ export const useProject = () => {
     openVideo,
     saveProject,
     toggleWordDelete,
+    toggleWordsDelete,
     deleteFillers,
     undo,
     redo,
