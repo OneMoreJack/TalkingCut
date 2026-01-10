@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Cpu, Download, HardDrive } from 'lucide-react';
+import { Check, ChevronDown, Cpu, Download, HardDrive, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { DownloadProgress, ModelWithStatus } from '../hooks/useModelDownload';
 
@@ -9,6 +9,7 @@ interface ModelSelectorProps {
   downloadProgress: DownloadProgress | null;
   onDownload: (id: string) => void;
   onCancel: () => void;
+  onDelete: (id: string) => void;
   isDownloading: boolean;
 }
 
@@ -19,10 +20,10 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   downloadProgress,
   onDownload,
   onCancel,
+  onDelete,
   isDownloading
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [category, setCategory] = useState<'all' | 'en'>('all');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedModel = models.find(m => m.id === currentModelId);
@@ -38,7 +39,6 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filteredModels = models.filter(m => m.category === category);
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -109,33 +109,10 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
       {/* Dropdown Menu */}
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl z-50 overflow-hidden border border-zinc-200 animate-in fade-in slide-in-from-top-2 duration-200">
-          {/* Tabs */}
-          <div className="flex p-1 bg-zinc-100/50 border-b border-zinc-100">
-            <button
-              onClick={(e) => { e.stopPropagation(); setCategory('all'); }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all ${
-                category === 'all' 
-                ? 'bg-white text-zinc-900 shadow-sm' 
-                : 'text-zinc-500 hover:text-zinc-700'
-              }`}
-            >
-              All Languages
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setCategory('en'); }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all ${
-                category === 'en' 
-                ? 'bg-white text-zinc-900 shadow-sm' 
-                : 'text-zinc-500 hover:text-zinc-700'
-              }`}
-            >
-              English-Only
-            </button>
-          </div>
 
           {/* Model List */}
           <div className="max-h-[400px] overflow-y-auto">
-            {filteredModels.map((model) => (
+            {models.map((model) => (
               <div
                 key={model.id}
                 onClick={(e) => {
@@ -170,15 +147,40 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                   </div>
                 </div>
                 
-                {model.status.installed ? (
-                  <span className="px-2 py-1 bg-green-50 text-green-600 text-[10px] rounded-full font-bold">
-                    Cached
-                  </span>
-                ) : (
-                  <span className="px-2 py-1 bg-zinc-100 text-zinc-500 text-[10px] rounded-full font-bold group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                    Available
-                  </span>
-                )}
+                <div className="flex items-center space-x-2">
+                  {model.status.installed ? (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete cached model "${model.name}"?`)) {
+                            onDelete(model.id);
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 text-zinc-400 hover:text-red-500 rounded-lg transition-all"
+                        title="Delete cached model"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                      <span className="px-2 py-1 bg-green-50 text-green-600 text-[10px] rounded-full font-bold">
+                        Cached
+                      </span>
+                    </>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect(model.id);
+                        onDownload(model.id);
+                        setIsOpen(false);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-indigo-50 text-zinc-400 hover:text-indigo-600 rounded-lg transition-all"
+                      title="Download model"
+                    >
+                      <Download size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

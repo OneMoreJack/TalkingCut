@@ -14,10 +14,12 @@ import { LocalModelStatus, MODEL_DEFINITIONS, ModelInfo } from '../models/modelD
 export class ModelManager {
   private modelsDir: string;
   private huggingFaceCacheDir: string;
+  private deletedModelsPath: string;
 
   constructor() {
     this.modelsDir = path.join(app.getPath('userData'), 'models');
     this.huggingFaceCacheDir = path.join(os.homedir(), '.cache', 'huggingface', 'hub');
+    this.deletedModelsPath = path.join(app.getPath('userData'), 'deleted-models.json');
 
     // Ensure models directory exists
     if (!fs.existsSync(this.modelsDir)) {
@@ -61,7 +63,8 @@ export class ModelManager {
   async getModelStatus(model: ModelInfo): Promise<LocalModelStatus> {
     const modelPath = this.getModelPath(model.id);
 
-    // Check if model exists in our directory
+    // 1. 优先级最高：物理文件检查
+    // 如果本地目录存在且文件完整，强制返回已安装（覆盖任何删除标记）
     if (fs.existsSync(modelPath)) {
       const stats = fs.lstatSync(modelPath);
       const isSymlink = stats.isSymbolicLink();
@@ -69,7 +72,19 @@ export class ModelManager {
       // Verify model files exist
       const isComplete = this.verifyModelFiles(model, modelPath);
 
+      console.log(`[ModelManager] Physical check for ${model.id}: exists=${true}, isSymlink=${isSymlink}, isComplete=${isComplete}`);
+
+      // 列出目录内容用于调试
+      try {
+        const files = fs.readdirSync(modelPath);
+        console.log(`[ModelManager] Files in ${model.id}: ${files.join(', ')}`);
+      } catch (e) {
+        console.log(`[ModelManager] Could not read dir for ${model.id}`);
+      }
+
       if (isComplete) {
+        // 自动修复：既然文件存在且完整，就确保删除标记已清除
+        this.clearDeletedMark(model.id);
         return {
           id: model.id,
           installed: true,
@@ -80,7 +95,17 @@ export class ModelManager {
       }
     }
 
-    // Check HuggingFace cache
+    // 2. 检查删除标记：只有在本地物理文件不存在/不完整时，才看是否被用户明确删除
+    if (this.isModelDeleted(model.id)) {
+      console.log(`[ModelManager] ${model.id} is in deleted list, skipping cache check`);
+      return {
+        id: model.id,
+        installed: false,
+        source: 'none'
+      };
+    }
+
+    // 3. 扫描 HuggingFace 缓存并尝试建立 Symlink
     const hfPath = this.findInHuggingFaceCache(model);
     if (hfPath) {
       // Create symlink to existing model
@@ -208,10 +233,28 @@ export class ModelManager {
   async deleteModel(modelId: string): Promise<void> {
     const modelPath = this.getModelPath(modelId);
 
+    // Delete model directory
     if (fs.existsSync(modelPath)) {
       fs.rmSync(modelPath, { recursive: true });
-      console.log(`[ModelManager] Deleted model: ${modelId}`);
+      console.log(`[ModelManager] Deleted model directory: ${modelId}`);
     }
+
+    // Clean up progress file (important for re-downloading)
+    const progressPath = path.join(this.modelsDir, `${modelId}.progress`);
+    if (fs.existsSync(progressPath)) {
+      fs.unlinkSync(progressPath);
+      console.log(`[ModelManager] Deleted progress file for: ${modelId}`);
+    }
+
+    // Clean up any partial files
+    const partialPath = path.join(this.modelsDir, `${modelId}.partial`);
+    if (fs.existsSync(partialPath)) {
+      fs.rmSync(partialPath, { recursive: true });
+      console.log(`[ModelManager] Deleted partial files for: ${modelId}`);
+    }
+
+    // Mark model as explicitly deleted to prevent auto-recreation
+    this.markModelAsDeleted(modelId);
   }
 
   /**
@@ -237,6 +280,61 @@ export class ModelManager {
       return info;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Check if a model was explicitly deleted by the user
+   */
+  private isModelDeleted(modelId: string): boolean {
+    if (!fs.existsSync(this.deletedModelsPath)) {
+      return false;
+    }
+
+    try {
+      const deletedModels = JSON.parse(fs.readFileSync(this.deletedModelsPath, 'utf-8'));
+      return deletedModels.includes(modelId);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Mark a model as explicitly deleted
+   */
+  private markModelAsDeleted(modelId: string): void {
+    let deletedModels: string[] = [];
+
+    if (fs.existsSync(this.deletedModelsPath)) {
+      try {
+        deletedModels = JSON.parse(fs.readFileSync(this.deletedModelsPath, 'utf-8'));
+      } catch {
+        deletedModels = [];
+      }
+    }
+
+    if (!deletedModels.includes(modelId)) {
+      deletedModels.push(modelId);
+      fs.writeFileSync(this.deletedModelsPath, JSON.stringify(deletedModels, null, 2));
+      console.log(`[ModelManager] Marked ${modelId} as deleted`);
+    }
+  }
+
+  /**
+   * Clear the deleted mark for a model (called when re-downloading)
+   */
+  clearDeletedMark(modelId: string): void {
+    if (!fs.existsSync(this.deletedModelsPath)) {
+      return;
+    }
+
+    try {
+      let deletedModels: string[] = JSON.parse(fs.readFileSync(this.deletedModelsPath, 'utf-8'));
+      deletedModels = deletedModels.filter(id => id !== modelId);
+      fs.writeFileSync(this.deletedModelsPath, JSON.stringify(deletedModels, null, 2));
+      console.log(`[ModelManager] Cleared deleted mark for ${modelId}`);
+    } catch (error) {
+      console.warn(`[ModelManager] Failed to clear deleted mark for ${modelId}:`, error);
     }
   }
 }

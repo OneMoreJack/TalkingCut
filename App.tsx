@@ -159,6 +159,7 @@ const App: React.FC = () => {
                 downloadProgress={modelDownload.downloadProgress}
                 onDownload={modelDownload.downloadModel}
                 onCancel={modelDownload.cancelDownload}
+                onDelete={modelDownload.deleteModel}
                 isDownloading={modelDownload.isDownloading}
               />
             </div>

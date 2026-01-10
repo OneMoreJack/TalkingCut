@@ -41,29 +41,62 @@ export class DownloadManager {
    */
   async downloadModel(model: ModelInfo): Promise<void> {
     const modelDir = path.join(this.modelsDir, model.id);
+    console.log(`[DownloadManager] Starting download for ${model.id}`);
+    console.log(`[DownloadManager] Model dir: ${modelDir}`);
+    console.log(`[DownloadManager] Files to download: ${model.files.map(f => f.name).join(', ')}`);
+
+    // Force cleanup: delete any existing model directory and progress files
+    // This ensures a clean download even if previous download was interrupted
+    if (fs.existsSync(modelDir)) {
+      const stats = fs.lstatSync(modelDir);
+      // Also check if it's a symlink - if so, remove it
+      if (stats.isSymbolicLink()) {
+        fs.unlinkSync(modelDir);
+        console.log(`[DownloadManager] Removed symlink for ${model.id}`);
+      } else {
+        const files = fs.readdirSync(modelDir);
+        if (files.length === 0 || !files.includes('model.bin')) {
+          // Empty or incomplete - remove and start fresh
+          fs.rmSync(modelDir, { recursive: true });
+          console.log(`[DownloadManager] Cleaned up incomplete model directory for ${model.id}`);
+        } else {
+          console.log(`[DownloadManager] Model ${model.id} already has model.bin, skipping download`);
+          // Emit completion immediately
+          this.emitProgress({
+            modelId: model.id,
+            fileName: 'all',
+            downloaded: 0,
+            total: 0,
+            percent: 100,
+            speed: 0,
+            eta: 0,
+            status: 'completed'
+          });
+          return;
+        }
+      }
+    }
+
+    // Always clean up progress file to ensure fresh download
+    const progressPath = path.join(this.modelsDir, `${model.id}.progress`);
+    if (fs.existsSync(progressPath)) {
+      fs.unlinkSync(progressPath);
+      console.log(`[DownloadManager] Cleaned up stale progress file for ${model.id}`);
+    }
 
     // Create model directory
     if (!fs.existsSync(modelDir)) {
       fs.mkdirSync(modelDir, { recursive: true });
+      console.log(`[DownloadManager] Created model directory for ${model.id}`);
     }
 
-    // Check for partial download progress
-    const progressPath = path.join(this.modelsDir, `${model.id}.progress`);
     let startFromFile = 0;
 
-    if (fs.existsSync(progressPath)) {
-      try {
-        const savedProgress = JSON.parse(fs.readFileSync(progressPath, 'utf-8'));
-        startFromFile = savedProgress.fileIndex || 0;
-        console.log(`[DownloadManager] Resuming from file ${startFromFile}`);
-      } catch {
-        // Start fresh
-      }
-    }
-
     // Download each file
+    console.log(`[DownloadManager] Starting file downloads for ${model.id}`);
     for (let i = startFromFile; i < model.files.length; i++) {
       const file = model.files[i];
+      console.log(`[DownloadManager] Downloading file ${i + 1}/${model.files.length}: ${file.name}`);
 
       // Save progress for resume
       fs.writeFileSync(progressPath, JSON.stringify({ fileIndex: i }));
@@ -79,6 +112,8 @@ export class DownloadManager {
     if (fs.existsSync(progressPath)) {
       fs.unlinkSync(progressPath);
     }
+
+    console.log(`[DownloadManager] All files downloaded for ${model.id}`);
 
     // Emit final completion event for the WHOLE model
     this.emitProgress({
@@ -143,9 +178,12 @@ export class DownloadManager {
       };
 
       const request = protocol.get(url, { headers }, (response) => {
+        console.log(`[DownloadManager] ${file.name} response: ${response.statusCode}`);
+
         // Handle redirects
-        if (response.statusCode === 301 || response.statusCode === 302) {
+        if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307 || response.statusCode === 308) {
           const redirectUrl = response.headers.location;
+          console.log(`[DownloadManager] ${file.name} redirecting to: ${redirectUrl}`);
           if (redirectUrl) {
             // Follow redirect
             this.downloadFileFromUrl(modelId, file, redirectUrl, partialPath, existingSize)
@@ -157,6 +195,7 @@ export class DownloadManager {
 
         // Check for successful response
         if (response.statusCode !== 200 && response.statusCode !== 206) {
+          console.error(`[DownloadManager] ${file.name} failed: HTTP ${response.statusCode}`);
           reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
           return;
         }

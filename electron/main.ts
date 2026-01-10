@@ -54,6 +54,9 @@ function createWindow(): void {
     trafficLightPosition: { x: 16, y: 16 },
   });
 
+  // Set main window reference for download progress events
+  downloadManager.setMainWindow(mainWindow);
+
   // Load the Vite dev server in development, or the built files in production
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -227,6 +230,8 @@ function setupIpcHandlers(): void {
     }
 
     try {
+      // Clear deleted mark BEFORE downloading so UI updates correctly on completion
+      modelManager.clearDeletedMark(modelId);
       await downloadManager.downloadModel(model);
       return { success: true };
     } catch (error) {
@@ -256,11 +261,6 @@ function setupIpcHandlers(): void {
 app.whenReady().then(() => {
   setupIpcHandlers();
   createWindow();
-
-  // Set main window reference for progress events
-  if (mainWindow) {
-    downloadManager.setMainWindow(mainWindow);
-  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
