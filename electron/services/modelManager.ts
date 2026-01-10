@@ -168,10 +168,12 @@ export class ModelManager {
       const stats = fs.statSync(modelBinPath);
       // Main weights should be at least 10MB (Tiny is ~75MB)
       if (stats.size > 10 * 1024 * 1024) {
+        console.log(`[ModelManager] Verified ${model.id}: model.bin exists (${stats.size} bytes)`);
         return true;
       }
     }
 
+    console.log(`[ModelManager] ${model.id} not verified: model.bin missing or too small`);
     return false;
   }
 

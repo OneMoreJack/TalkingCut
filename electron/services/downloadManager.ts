@@ -80,6 +80,18 @@ export class DownloadManager {
       fs.unlinkSync(progressPath);
     }
 
+    // Emit final completion event for the WHOLE model
+    this.emitProgress({
+      modelId: model.id,
+      fileName: 'all',
+      downloaded: 0,
+      total: 0,
+      percent: 100,
+      speed: 0,
+      eta: 0,
+      status: 'completed'
+    });
+
     console.log(`[DownloadManager] Model ${model.id} download complete`);
   }
 
@@ -214,7 +226,7 @@ export class DownloadManager {
             percent: 100,
             speed: 0,
             eta: 0,
-            status: 'completed'
+            status: 'downloading' // Keep as downloading until last file is done
           });
 
           resolve();

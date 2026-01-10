@@ -59,7 +59,7 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     files: [
       { name: 'model.bin', url: 'https://hf-mirror.com/Systran/faster-whisper-tiny/resolve/main/model.bin', size: 75000000 },
       { name: 'config.json', url: 'https://hf-mirror.com/Systran/faster-whisper-tiny/resolve/main/config.json', size: 2000 },
-      { name: 'vocabulary.json', url: 'https://hf-mirror.com/Systran/faster-whisper-tiny/resolve/main/vocabulary.json', size: 1000000 },
+      { name: 'vocabulary.txt', url: 'https://hf-mirror.com/Systran/faster-whisper-tiny/resolve/main/vocabulary.txt', size: 1000000 },
       { name: 'tokenizer.json', url: 'https://hf-mirror.com/Systran/faster-whisper-tiny/resolve/main/tokenizer.json', size: 2500000 },
     ]
   },
@@ -75,7 +75,7 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     files: [
       { name: 'model.bin', url: 'https://hf-mirror.com/Systran/faster-whisper-base/resolve/main/model.bin', size: 145000000 },
       { name: 'config.json', url: 'https://hf-mirror.com/Systran/faster-whisper-base/resolve/main/config.json', size: 2000 },
-      { name: 'vocabulary.json', url: 'https://hf-mirror.com/Systran/faster-whisper-base/resolve/main/vocabulary.json', size: 1000000 },
+      { name: 'vocabulary.txt', url: 'https://hf-mirror.com/Systran/faster-whisper-base/resolve/main/vocabulary.txt', size: 1000000 },
       { name: 'tokenizer.json', url: 'https://hf-mirror.com/Systran/faster-whisper-base/resolve/main/tokenizer.json', size: 2500000 },
     ]
   },
@@ -91,7 +91,7 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     files: [
       { name: 'model.bin', url: 'https://hf-mirror.com/Systran/faster-whisper-small/resolve/main/model.bin', size: 470000000 },
       { name: 'config.json', url: 'https://hf-mirror.com/Systran/faster-whisper-small/resolve/main/config.json', size: 2000 },
-      { name: 'vocabulary.json', url: 'https://hf-mirror.com/Systran/faster-whisper-small/resolve/main/vocabulary.json', size: 1000000 },
+      { name: 'vocabulary.txt', url: 'https://hf-mirror.com/Systran/faster-whisper-small/resolve/main/vocabulary.txt', size: 1000000 },
       { name: 'tokenizer.json', url: 'https://hf-mirror.com/Systran/faster-whisper-small/resolve/main/tokenizer.json', size: 2500000 },
     ]
   },
@@ -107,7 +107,7 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     files: [
       { name: 'model.bin', url: 'https://hf-mirror.com/Systran/faster-whisper-medium/resolve/main/model.bin', size: 1500000000 },
       { name: 'config.json', url: 'https://hf-mirror.com/Systran/faster-whisper-medium/resolve/main/config.json', size: 2000 },
-      { name: 'vocabulary.json', url: 'https://hf-mirror.com/Systran/faster-whisper-medium/resolve/main/vocabulary.json', size: 1000000 },
+      { name: 'vocabulary.txt', url: 'https://hf-mirror.com/Systran/faster-whisper-medium/resolve/main/vocabulary.txt', size: 1000000 },
       { name: 'tokenizer.json', url: 'https://hf-mirror.com/Systran/faster-whisper-medium/resolve/main/tokenizer.json', size: 2500000 },
     ]
   },
@@ -123,7 +123,7 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     files: [
       { name: 'model.bin', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3-turbo/resolve/main/model.bin', size: 1600000000 },
       { name: 'config.json', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3-turbo/resolve/main/config.json', size: 2000 },
-      { name: 'vocabulary.json', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3-turbo/resolve/main/vocabulary.json', size: 1000000 },
+      { name: 'vocabulary.txt', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3-turbo/resolve/main/vocabulary.txt', size: 1000000 },
       { name: 'tokenizer.json', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3-turbo/resolve/main/tokenizer.json', size: 2500000 },
     ]
   },
@@ -139,7 +139,7 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     files: [
       { name: 'model.bin', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3/resolve/main/model.bin', size: 3100000000 },
       { name: 'config.json', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3/resolve/main/config.json', size: 2000 },
-      { name: 'vocabulary.json', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3/resolve/main/vocabulary.json', size: 1000000 },
+      { name: 'vocabulary.txt', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3/resolve/main/vocabulary.txt', size: 1000000 },
       { name: 'tokenizer.json', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3/resolve/main/tokenizer.json', size: 2500000 },
     ]
   }
