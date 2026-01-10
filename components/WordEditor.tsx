@@ -1,6 +1,6 @@
 
 import { RotateCcw, Trash2 } from 'lucide-react';
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { WordSegment, WordType } from '../types/index';
 
 interface WordEditorProps {
@@ -13,7 +13,11 @@ interface WordEditorProps {
 }
 
 const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggleDelete, onToggleWordsDelete, onWordClick, searchTerm }) => {
-  // ... (Grouping Logic remains same)
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectionRect, setSelectionRect] = useState<{ top: number; left: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // --- Grouping Logic ---
   const sentences = useMemo(() => {
     const groups: WordSegment[][] = [];
     let currentGroup: WordSegment[] = [];
@@ -21,13 +25,10 @@ const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggle
     segments.forEach((word, index) => {
       currentGroup.push(word);
 
-      // Boundary detectors
+      // Boundary detectors: Only punctuation now
       const hasPunctuation = /[.?!。？！,，]$/.test(word.text);
-      const nextWord = segments[index + 1];
-      const isLargeGap = nextWord ? (nextWord.start - word.end > 1.2) : false;
-      const isSilence = word.type === WordType.SILENCE;
-
-      if (hasPunctuation || isLargeGap || isSilence || index === segments.length - 1) {
+      
+      if (hasPunctuation || index === segments.length - 1) {
         if (currentGroup.length > 0) {
           groups.push(currentGroup);
           currentGroup = [];
@@ -38,6 +39,9 @@ const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggle
     return groups;
   }, [segments]);
 
+  // Helper to check if a string contains English letters
+  const isEnglish = (text: string) => /[a-zA-Z]/.test(text);
+
   // Helper to format time (e.g. 65.5 -> 01:05)
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -45,8 +49,74 @@ const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggle
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Selection Handling
+  const handleMouseUp = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+      setSelectedIds([]);
+      setSelectionRect(null);
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Find all word IDs within the range
+    const ids: string[] = [];
+    const wordSpans = container.querySelectorAll('[data-word-id]');
+    
+    wordSpans.forEach((span) => {
+      if (selection.containsNode(span, true)) {
+        const id = span.getAttribute('data-word-id');
+        if (id) ids.push(id);
+      }
+    });
+
+    if (ids.length > 0) {
+      setSelectedIds(ids);
+      const rect = range.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      setSelectionRect({
+        top: rect.top - containerRect.top - 40,
+        left: rect.left - containerRect.left + rect.width / 2
+      });
+    } else {
+      setSelectedIds([]);
+      setSelectionRect(null);
+    }
+  };
+
+  const handleDeleteSelection = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleWordsDelete(selectedIds);
+    setSelectedIds([]);
+    setSelectionRect(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
   return (
-    <div className="p-8 max-w-5xl mx-auto leading-relaxed space-y-6">
+    <div 
+      ref={containerRef}
+      onMouseUp={handleMouseUp}
+      className="p-8 max-w-5xl mx-auto leading-relaxed space-y-6 relative"
+    >
+      {/* Floating Action Button for Selection */}
+      {selectionRect && selectedIds.length > 0 && (
+        <div 
+          className="absolute z-50 animate-in fade-in zoom-in duration-200"
+          style={{ top: selectionRect.top, left: selectionRect.left, transform: 'translateX(-50%)' }}
+        >
+          <button
+            onClick={handleDeleteSelection}
+            className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-full shadow-lg text-xs font-medium"
+          >
+            <Trash2 size={12} />
+            <span>Delete Selection</span>
+          </button>
+        </div>
+      )}
+
       {sentences.map((sentence, sIdx) => {
         const startTime = sentence[0]?.start ?? 0;
         const sentenceIds = sentence.map(w => w.id);
@@ -55,7 +125,7 @@ const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggle
         return (
           <div key={`s-${sIdx}`} className="flex flex-col group/sentence space-y-2">
             {/* Sentence Header (Timestamp & Delete) */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 select-none">
               <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800/50 px-1.5 py-0.5 rounded">
                 {formatTime(startTime)}
               </span>
@@ -68,40 +138,36 @@ const WordEditor: React.FC<WordEditorProps> = ({ segments, currentTime, onToggle
               </button>
             </div>
 
-            {/* Sentence Content */}
-            <div className="flex flex-wrap gap-x-1 gap-y-1.5">
-              {sentence.map((word) => {
+            {/* Sentence Content - Inline Layout */}
+            <div className="text-base text-zinc-300">
+              {sentence.map((word, wIdx) => {
                 const isActive = currentTime >= word.start && currentTime < word.end;
                 const isFiller = word.type === WordType.FILLER;
                 const isSilence = word.type === WordType.SILENCE;
                 const isMatched = searchTerm && word.text.toLowerCase().includes(searchTerm.toLowerCase());
+                
+                const nextWord = sentence[wIdx + 1];
+                const needsSpace = isEnglish(word.text) && nextWord && !/^[.,!?;:。？！，、]/.test(nextWord.text);
 
                 return (
-                  <span
-                    key={word.id}
-                    onClick={() => onWordClick(word.start)}
-                    className={`
-                      relative group/word cursor-pointer text-base px-1 py-0.5 rounded transition-all
-                      ${word.deleted ? 'opacity-30 line-through grayscale text-zinc-600' : ''}
-                      ${isActive ? 'bg-indigo-600 text-white shadow-md z-10' : ''}
-                      ${!isActive && isMatched ? 'bg-yellow-500/20 ring-1 ring-yellow-500/50' : ''}
-                      ${!isActive && !word.deleted && !isMatched ? 'hover:bg-zinc-800' : ''}
-                      ${isFiller ? 'underline decoration-yellow-500/50 decoration-wavy' : ''}
-                      ${isSilence ? 'text-zinc-500 italic text-sm border border-zinc-700/50 bg-zinc-800/20 px-2 my-1' : ''}
-                    `}
-                  >
-                    {word.text}
-                    
-                    {/* Quick Actions Hover Menu */}
-                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 hidden group-hover/word:flex bg-zinc-800 shadow-xl rounded-lg border border-zinc-700 overflow-hidden z-20">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); onToggleDelete(word.id); }}
-                        className="p-2 hover:bg-zinc-700 text-zinc-300"
-                      >
-                        {word.deleted ? <RotateCcw size={14} /> : <Trash2 size={14} className="text-red-400" />}
-                      </button>
-                    </div>
-                  </span>
+                  <React.Fragment key={word.id}>
+                    <span
+                      data-word-id={word.id}
+                      onClick={() => onWordClick(word.start)}
+                      className={`
+                        inline-block cursor-pointer px-0.5 rounded transition-all
+                        ${word.deleted ? 'opacity-30 line-through grayscale text-zinc-600' : ''}
+                        ${isActive ? 'bg-indigo-600 text-white shadow-md z-10' : ''}
+                        ${!isActive && isMatched ? 'bg-yellow-500/20 ring-1 ring-yellow-500/50' : ''}
+                        ${!isActive && !word.deleted && !isMatched ? 'hover:bg-zinc-800' : ''}
+                        ${isFiller ? 'underline decoration-yellow-500/50 decoration-wavy' : ''}
+                        ${isSilence ? 'text-zinc-500 italic text-[13px] border border-zinc-700/50 bg-zinc-800/20 px-1.5 mx-0.5' : ''}
+                      `}
+                    >
+                      {word.text}
+                    </span>
+                    {needsSpace && <span className="inline select-none"> </span>}
+                  </React.Fragment>
                 );
               })}
             </div>
