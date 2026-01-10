@@ -32,6 +32,11 @@ export interface WordSegment {
   confidence: number;
   type: 'word' | 'filler' | 'silence';
   deleted: boolean;
+  segmentId?: string;
+  isLastInSegment?: boolean;
+  hasTrailingSpace?: boolean;
+  duration?: number;
+  language?: string;
 }
 
 export interface TranscribeResult {

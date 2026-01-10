@@ -13,6 +13,12 @@ export interface WordSegment {
   confidence: number;
   type: WordType;
   deleted: boolean;
+  // Segmentation and display fields
+  segmentId?: string;
+  isLastInSegment?: boolean;
+  hasTrailingSpace?: boolean;
+  duration?: number; // For silence segments
+  language?: string;
 }
 
 export interface VideoProject {
@@ -26,6 +32,7 @@ export interface VideoProject {
     paddingEnd: number;
     minSilenceDuration: number;
     crossfadeDuration: number;
+    breakGap: number; // Gap threshold for line breaks in transcript (default: 1.0s)
   };
 }
 

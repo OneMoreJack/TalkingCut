@@ -19,6 +19,7 @@ os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 import argparse
 import json
 import os
+import re
 import sys
 import uuid
 from pathlib import Path
@@ -141,7 +142,8 @@ def transcribe_audio(
     model_size: str = "base",
     language: str | None = None,
     device: str | None = None,
-    batch_size: int = 16
+    batch_size: int = 16,
+    break_gap: float = 1.0
 ) -> list[dict]:
     """
     Transcribe audio file using WhisperX with word-level alignment.
@@ -152,6 +154,7 @@ def transcribe_audio(
         language: Language code (e.g., 'en', 'zh') or None for auto-detect
         device: Device to use (mps, cuda, cpu) or None for auto-detect
         batch_size: Batch size for inference
+        break_gap: Minimum gap (in seconds) between words to force a line break (default: 1.0)
     
     Returns:
         List of word segments with timing and type information
@@ -226,11 +229,14 @@ def transcribe_audio(
     align_time = time.time() - align_start
     print(f"[TalkingCut] Alignment completed in {align_time:.2f}s")
     
-    # Process segments
-    segments = []
+    # Process segments - first pass: collect all word segments
+    word_segments = []
     
     for segment in aligned.get("segments", []):
-        for word_info in segment.get("words", []):
+        segment_id = segment.get("id", str(uuid.uuid4()))
+        words = segment.get("words", [])
+        
+        for i, word_info in enumerate(words):
             word_text = word_info.get("word", "").strip()
             if not word_text:
                 continue
@@ -240,29 +246,71 @@ def transcribe_audio(
             if is_filler_word(word_text, detected_language):
                 word_type = "filler"
             
-            segments.append({
+            # Check if ends with punctuation (for semantic protection)
+            ends_with_punctuation = bool(re.search(r'[。？！.?!]$', word_text))
+            
+            word_segments.append({
                 "id": str(uuid.uuid4()),
                 "text": word_text,
                 "start": round(word_info.get("start", 0), 3),
                 "end": round(word_info.get("end", 0), 3),
                 "confidence": round(word_info.get("score", 0.0), 3),
                 "type": word_type,
-                "deleted": False
+                "deleted": False,
+                "segmentId": str(segment_id),
+                "endsWithPunctuation": ends_with_punctuation,
+                # Language info for frontend
+                "language": detected_language
             })
     
-    # Add silence segments
+    # Second pass: calculate gap-based isLastInSegment and hasTrailingSpace
+    for i, word in enumerate(word_segments):
+        is_last = False
+        has_trailing_space = False
+        
+        # Check if this is the last word overall
+        if i == len(word_segments) - 1:
+            is_last = True
+        else:
+            next_word = word_segments[i + 1]
+            gap = next_word["start"] - word["end"]
+            
+            # Gap-based break (using break_gap parameter)
+            if gap >= break_gap:
+                is_last = True
+            
+            # Semantic protection: always break after sentence-ending punctuation
+            if word["endsWithPunctuation"]:
+                is_last = True
+            
+            # Trailing space for English (add space unless it's the last word in sentence)
+            if detected_language == "en" and not is_last:
+                has_trailing_space = True
+        
+        word["isLastInSegment"] = is_last
+        word["hasTrailingSpace"] = has_trailing_space
+        # Remove temporary field
+        del word["endsWithPunctuation"]
+    
+    # Add silence segments with duration info
     print("[TalkingCut] Detecting silences...")
     silences = detect_silences(audio_path)
     
+    segments = word_segments.copy()
+    
     for silence in silences:
+        duration = round(silence["end"] - silence["start"], 1)
         segments.append({
             "id": str(uuid.uuid4()),
-            "text": "[静音]",
+            "text": f"[{duration}s]",
             "start": round(silence["start"], 3),
             "end": round(silence["end"], 3),
             "confidence": 1.0,
             "type": "silence",
-            "deleted": False
+            "deleted": False,
+            "duration": duration,
+            "isLastInSegment": duration >= break_gap,  # Break after long silences
+            "hasTrailingSpace": False
         })
     
     # Sort all segments by start time
@@ -333,6 +381,13 @@ def main():
         help="Batch size for inference (default: 16)"
     )
     
+    parser.add_argument(
+        "--break-gap",
+        type=float,
+        default=1.0,
+        help="Minimum gap (in seconds) between words to force a line break (default: 1.0)"
+    )
+    
     args = parser.parse_args()
     
     print("[TalkingCut] Python engine started")
@@ -350,7 +405,8 @@ def main():
             model_size=args.model,
             language=args.language,
             device=args.device,
-            batch_size=args.batch_size
+            batch_size=args.batch_size,
+            break_gap=args.break_gap
         )
         
         # Output result

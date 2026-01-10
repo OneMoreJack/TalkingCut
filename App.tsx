@@ -225,6 +225,15 @@ const App: React.FC = () => {
                     onChange={(e) => updateSettings({ crossfadeDuration: parseFloat(e.target.value) })}
                   />
                 </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span>Break Gap (s)</span>
+                  <input 
+                    type="number" step="0.1" min="0.1" max="5"
+                    className="w-16 bg-zinc-800 rounded px-2 py-1 outline-none focus:ring-1 ring-indigo-500"
+                    value={project.settings.breakGap ?? 1.0}
+                    onChange={(e) => updateSettings({ breakGap: parseFloat(e.target.value) || 1.0 })}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -289,6 +298,7 @@ const App: React.FC = () => {
                 onToggleWordsDelete={toggleWordsDelete}
                 onWordClick={handleJumpToTime}
                 searchTerm={searchTerm}
+                breakGap={project.settings.breakGap ?? 1.0}
               />
             )}
           </div>
