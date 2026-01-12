@@ -1,12 +1,14 @@
 import {
-  Download,
-  FileVideo,
-  Play,
-  Redo2,
-  Scissors,
-  Search,
-  Trash2,
-  Undo2
+    Check,
+    Download,
+    FileVideo,
+    Play,
+    Redo2,
+    Scissors,
+    Search,
+    Trash2,
+    Undo2,
+    Zap
 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ModelSelector from './components/ModelSelector';
@@ -41,6 +43,9 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const skipFlag = useRef(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [originalVideoSrc, setOriginalVideoSrc] = useState<string | null>(null);
+  const [isPreviewProcessing, setIsPreviewProcessing] = useState(false);
 
   // 1. Export Logic
   const handleExport = async () => {
@@ -57,6 +62,55 @@ const App: React.FC = () => {
       outputPath,
       ffmpegCommand
     });
+  };
+
+  const handleApply = async () => {
+    if (!project || !window.electronAPI) return;
+    
+    setIsPreviewProcessing(true);
+    try {
+      const workspace = await window.electronAPI.temp.getWorkspace();
+      const tempPath = `${workspace}/preview_${Date.now()}.mp4`;
+      
+      const ffmpegCommand = generateFFmpegCommand(project, tempPath);
+      if (!ffmpegCommand) {
+        setIsPreviewProcessing(false);
+        return;
+      }
+
+      const result = await window.electronAPI.export.start({
+        videoPath: project.videoPath,
+        outputPath: tempPath,
+        ffmpegCommand
+      });
+
+      if (result.success && result.outputPath) {
+        // Switch to preview video
+        if (!isPreviewMode) {
+          setOriginalVideoSrc(videoSrc);
+        }
+        
+        const buffer = await window.electronAPI.readVideoFile(result.outputPath);
+        if (buffer) {
+          const blob = new Blob([buffer], { type: 'video/mp4' });
+          const url = URL.createObjectURL(blob);
+          setVideoSrc(url);
+          setIsPreviewMode(true);
+        }
+      }
+    } catch (error) {
+      console.error('[App] Apply/Preview failed:', error);
+    } finally {
+      setIsPreviewProcessing(false);
+    }
+  };
+
+  const exitPreview = () => {
+    if (originalVideoSrc) {
+      setVideoSrc(originalVideoSrc);
+      setOriginalVideoSrc(null);
+    }
+    setIsPreviewMode(false);
   };
 
   // ... (Virtual Preview and keyboard shortcuts logic remains same)
@@ -194,66 +248,52 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {project && (
-            <>
-              <div className="p-3 bg-zinc-900 rounded-lg space-y-2">
-                <h3 className="text-xs uppercase font-semibold text-zinc-500">Project Settings</h3>
-                <div className="flex justify-between items-center text-sm">
-                  <span>Start Padding</span>
-                  <input 
-                    type="number" step="0.1" 
-                    className="w-16 bg-zinc-800 rounded px-2 py-1 outline-none focus:ring-1 ring-indigo-500"
-                    value={project.settings.paddingStart}
-                    onChange={() => {}} 
-                  />
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span>End Padding</span>
-                  <input 
-                    type="number" step="0.1" 
-                    className="w-16 bg-zinc-800 rounded px-2 py-1 outline-none focus:ring-1 ring-indigo-500"
-                    value={project.settings.paddingEnd}
-                    onChange={() => {}} 
-                  />
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span>Crossfade (s)</span>
-                  <input 
-                    type="number" step="0.01" min="0" max="1"
-                    className="w-16 bg-zinc-800 rounded px-2 py-1 outline-none focus:ring-1 ring-indigo-500"
-                    value={project.settings.crossfadeDuration}
-                    onChange={(e) => updateSettings({ crossfadeDuration: parseFloat(e.target.value) })}
-                  />
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span>Break Gap (s)</span>
-                  <input 
-                    type="number" step="0.1" min="0.1" max="5"
-                    className="w-16 bg-zinc-800 rounded px-2 py-1 outline-none focus:ring-1 ring-indigo-500"
-                    value={project.settings.breakGap ?? 1.0}
-                    onChange={(e) => updateSettings({ breakGap: parseFloat(e.target.value) || 1.0 })}
-                  />
-                </div>
-              </div>
+          <div className="p-3 bg-zinc-900 rounded-lg space-y-2">
+            <h3 className="text-xs uppercase font-semibold text-zinc-500">Project Settings</h3>
+            <div className="flex justify-between items-center text-sm opacity-50 pointer-events-none">
+               <span className="text-zinc-500 italic">Advanced settings hidden</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className={!project ? "text-zinc-600" : ""}>Crossfade (s)</span>
+              <input 
+                disabled={!project}
+                type="number" step="0.01" min="0" max="1"
+                className="w-16 bg-zinc-800 rounded px-2 py-1 outline-none focus:ring-1 ring-indigo-500 disabled:opacity-50"
+                value={project?.settings.crossfadeDuration ?? 0.02}
+                onChange={(e) => updateSettings({ crossfadeDuration: parseFloat(e.target.value) })}
+              />
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className={!project ? "text-zinc-600" : ""}>Break Gap (s)</span>
+              <input 
+                disabled={!project}
+                type="number" step="0.1" min="0.1" max="5"
+                className="w-16 bg-zinc-800 rounded px-2 py-1 outline-none focus:ring-1 ring-indigo-500 disabled:opacity-50"
+                value={project?.settings.breakGap ?? 1.0}
+                onChange={(e) => updateSettings({ breakGap: parseFloat(e.target.value) || 1.0 })}
+              />
+            </div>
+          </div>
 
-              <div className="space-y-2">
-                <button 
-                  onClick={deleteFillers}
-                  className="w-full flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  <Trash2 size={16} />
-                  <span>Auto-Cut Silence & Fillers</span>
-                </button>
-                <button 
-                  onClick={handleExport}
-                  className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  <Download size={16} />
-                  <span>Export Final Cut</span>
-                </button>
-              </div>
-            </>
-          )}
+          <div className="space-y-2">
+            <button 
+              disabled={!project}
+              onClick={deleteFillers}
+              className="w-full flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-zinc-300"
+            >
+              <Trash2 size={16} />
+              <span>Auto-Cut Silence & Fillers</span>
+            </button>
+            <button 
+              disabled={!project}
+              onClick={handleExport}
+              className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download size={16} />
+              <span>Export Final Cut</span>
+            </button>
+          </div>
+
         </div>
 
         {status.step !== 'idle' && (
@@ -277,7 +317,21 @@ const App: React.FC = () => {
         {/* Text-Based Editor Section (Left) */}
         <div className="w-1/2 min-w-[320px] bg-zinc-900 border-r border-zinc-800 flex flex-col">
           <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-            <h2 className="text-sm font-semibold text-zinc-400">Transcript</h2>
+            <div className="flex items-center space-x-3">
+              <h2 className="text-sm font-semibold text-zinc-400">Transcript</h2>
+              <button
+                disabled={!project || isPreviewProcessing}
+                onClick={handleApply}
+                className="flex items-center space-x-1.5 px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded text-xs font-medium transition-colors disabled:opacity-30 border border-indigo-500/20"
+              >
+                {isPreviewProcessing ? (
+                  <div className="w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                ) : (
+                  <Zap size={12} className="fill-current" />
+                )}
+                <span>Apply & Preview</span>
+              </button>
+            </div>
             <div className="flex items-center bg-zinc-800 rounded-md px-3 py-1.5 w-64">
               <Search size={14} className="text-zinc-500 mr-2" />
               <input 
@@ -338,8 +392,23 @@ const App: React.FC = () => {
                       <span className="text-xs tabular-nums text-white">
                         {currentTime.toFixed(1)} / {project.duration.toFixed(1)}s
                       </span>
+                      {isPreviewMode && (
+                        <button 
+                          onClick={exitPreview}
+                          className="ml-auto px-2 py-1 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded text-[10px] font-bold uppercase tracking-wider transition-all border border-red-500/30"
+                        >
+                          Exit Preview
+                        </button>
+                      )}
                   </div>
                 </div>
+                {isPreviewMode && (
+                  <div className="absolute top-4 right-4 px-3 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-full shadow-lg flex items-center space-x-1.5">
+                    <Check size={12} />
+                    <span>PREVIEW MODE</span>
+                  </div>
+                )}
+
               </div>
             ) : (
               <div className="flex flex-col items-center text-zinc-600">
