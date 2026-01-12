@@ -2,6 +2,8 @@ import {
     Check,
     Download,
     FileVideo,
+    PanelLeftClose,
+    PanelLeftOpen,
     Play,
     Redo2,
     Scissors,
@@ -46,6 +48,16 @@ const App: React.FC = () => {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [originalVideoSrc, setOriginalVideoSrc] = useState<string | null>(null);
   const [isPreviewProcessing, setIsPreviewProcessing] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [showTimeline, setShowTimeline] = useState(true);
+  const [timelineZoom, setTimelineZoom] = useState(1);
+
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) videoRef.current.play();
+      else videoRef.current.pause();
+    }
+  };
 
   // 1. Export Logic
   const handleExport = async () => {
@@ -193,27 +205,11 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen w-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
       {/* Sidebar - Settings & File Info */}
-      <aside className="w-80 border-r border-zinc-800 flex flex-col p-4 space-y-6">
+      <aside className={`border-r border-zinc-800 flex flex-col p-4 space-y-6 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'w-80' : 'w-0 p-0 overflow-hidden border-none'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 text-indigo-400 font-bold text-xl">
             <Scissors size={24} />
             <span>TalkingCut</span>
-          </div>
-          <div className="flex space-x-1">
-             <button 
-              disabled={!canUndo} 
-              onClick={undo}
-              className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 disabled:opacity-20"
-            >
-              <Undo2 size={16} />
-            </button>
-            <button 
-              disabled={!canRedo} 
-              onClick={redo}
-              className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 disabled:opacity-20"
-            >
-              <Redo2 size={16} />
-            </button>
           </div>
         </div>
 
@@ -296,26 +292,6 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <button 
-              disabled={!project}
-              onClick={deleteFillers}
-              className="w-full flex items-center justify-center space-x-2 bg-zinc-800 hover:bg-zinc-700 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-zinc-300"
-            >
-              <Trash2 size={16} />
-              <span>Auto-Cut Silence & Fillers</span>
-            </button>
-            <button 
-              disabled={!project}
-              onClick={handleExport}
-              className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Download size={16} />
-              <span>Export Final Cut</span>
-            </button>
-          </div>
-
         </div>
 
         {status.step !== 'idle' && (
@@ -334,120 +310,218 @@ const App: React.FC = () => {
         )}
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-row relative bg-black overflow-hidden">
-        {/* Text-Based Editor Section (Left) */}
-        <div className="w-1/2 min-w-[320px] bg-zinc-900 border-r border-zinc-800 flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-            <div className="flex items-center space-x-3">
-              <h2 className="text-sm font-semibold text-zinc-400">Transcript</h2>
-              <button
-                disabled={!project || isPreviewProcessing}
-                onClick={handleApply}
-                className="flex items-center space-x-1.5 px-2.5 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded text-xs font-medium transition-colors disabled:opacity-30 border border-indigo-500/20"
-              >
-                {isPreviewProcessing ? (
-                  <div className="w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                ) : (
-                  <Zap size={12} className="fill-current" />
-                )}
-                <span>Apply & Preview</span>
-              </button>
-            </div>
-            <div className="flex items-center bg-zinc-800 rounded-md px-3 py-1.5 w-64">
-              <Search size={14} className="text-zinc-500 mr-2" />
-              <input 
-                type="text" 
-                placeholder="Search words..."
-                className="bg-transparent border-none outline-none text-xs w-full"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {project && (
-              <WordEditor 
-                segments={project.segments} 
-                currentTime={currentTime}
-                onToggleDelete={toggleWordDelete}
-                onToggleWordsDelete={toggleWordsDelete}
-                onWordClick={handleJumpToTime}
-                searchTerm={searchTerm}
-                breakGap={project.settings.silenceThreshold ?? 1.0}
-              />
-            )}
-          </div>
-        </div>
+      <main className="flex-1 flex flex-col bg-zinc-950 overflow-hidden relative">
 
-        {/* Video Preview & Timeline (Right) */}
-        <div className="flex-1 flex flex-col bg-zinc-950 overflow-hidden">
-          <div className="flex-1 flex items-center justify-center p-8 overflow-hidden">
+
+        <div className="flex-1 flex flex-row overflow-hidden border-b border-zinc-800">
+          {/* Transcript Section */}
+          <div className="w-1/2 min-w-[400px] flex flex-col bg-zinc-900 border-r border-zinc-800">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 h-14">
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors"
+                  title={isSidebarOpen ? "Hide sidebar" : "Show sidebar"}
+                >
+                  {isSidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+                </button>
+                <div className="flex items-center space-x-3 bg-zinc-800/50 rounded-md px-3 py-1 border border-zinc-800">
+                  <Search size={14} className="text-zinc-500" />
+                  <input 
+                    type="text" 
+                    placeholder="Search transcript..."
+                    className="bg-transparent border-none outline-none text-sm w-48 h-6"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-1">
+                <button 
+                  disabled={!canUndo} 
+                  onClick={undo}
+                  className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 disabled:opacity-20 transition-colors"
+                  title="Undo"
+                >
+                  <Undo2 size={16} />
+                </button>
+                <button 
+                  disabled={!canRedo} 
+                  onClick={redo}
+                  className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 disabled:opacity-20 transition-colors"
+                  title="Redo"
+                >
+                  <Redo2 size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {project ? (
+                <WordEditor 
+                  segments={project.segments} 
+                  currentTime={currentTime}
+                  onToggleDelete={toggleWordDelete}
+                  onToggleWordsDelete={toggleWordsDelete}
+                  onWordClick={handleJumpToTime}
+                  searchTerm={searchTerm}
+                  breakGap={project.settings.silenceThreshold ?? 1.0}
+                />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-zinc-600 p-8 text-center">
+                  <FileVideo size={48} className="mb-4 opacity-10" />
+                  <p className="text-sm">Wait for processing to complete or open a video file</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Video Preview Section */}
+          <div className="flex-1 flex items-center justify-center p-8 bg-black relative group">
             {project ? (
-              <div className="w-full h-full max-w-5xl rounded-2xl overflow-hidden bg-black shadow-2xl relative group">
+              <div className="relative w-full h-full max-w-4xl flex items-center justify-center">
                 <video 
                   ref={videoRef}
                   src={videoSrc || undefined}
-                  className="w-full h-full object-contain"
+                  className="max-w-full max-h-full rounded-lg shadow-2xl"
                   onLoadedMetadata={handleLoadedMetadata}
-                  onClick={() => videoRef.current?.paused ? videoRef.current.play() : videoRef.current?.pause()}
+                  onClick={togglePlay}
                   onTimeUpdate={() => {
-                     if (!skipFlag.current) {
+                      if (!skipFlag.current) {
                         setCurrentTime(videoRef.current?.currentTime || 0);
-                     }
+                      }
                   }}
                 />
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="flex items-center space-x-4">
-                      <button 
-                        onClick={() => videoRef.current?.paused ? videoRef.current.play() : videoRef.current?.pause()}
-                        className="p-2 bg-white text-black rounded-full hover:scale-110 transition-transform"
-                      >
-                        <Play size={20} fill="currentColor" />
-                      </button>
-                      <div className="flex-1 h-1 bg-zinc-600 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-indigo-500" 
-                          style={{ width: `${(currentTime / (project?.duration || 1)) * 100}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-xs tabular-nums text-white">
-                        {currentTime.toFixed(1)} / {project.duration.toFixed(1)}s
-                      </span>
-                      {isPreviewMode && (
-                        <button 
-                          onClick={exitPreview}
-                          className="ml-auto px-2 py-1 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded text-[10px] font-bold uppercase tracking-wider transition-all border border-red-500/30"
-                        >
-                          Exit Preview
-                        </button>
-                      )}
-                  </div>
-                </div>
+                
                 {isPreviewMode && (
-                  <div className="absolute top-4 right-4 px-3 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-full shadow-lg flex items-center space-x-1.5">
+                  <div className="absolute top-4 right-4 px-3 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-full shadow-lg flex items-center space-x-1.5 animate-pulse">
                     <Check size={12} />
                     <span>PREVIEW MODE</span>
                   </div>
                 )}
+                
+                {isPreviewMode && (
+                  <button 
+                    onClick={exitPreview}
+                    className="absolute top-4 left-4 px-3 py-1 bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white rounded-full text-[10px] font-bold uppercase transition-all flex items-center space-x-1 border border-red-600/30"
+                  >
+                    <span>Exit Preview</span>
+                  </button>
+                )}
 
+                <button 
+                  disabled={!project}
+                  onClick={handleExport}
+                  className="absolute top-4 right-4 flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50 shadow-2xl z-20"
+                >
+                  <Download size={14} />
+                  <span>Export Final Cut</span>
+                </button>
               </div>
             ) : (
-              <div className="flex flex-col items-center text-zinc-600">
-                <FileVideo size={64} className="mb-4 opacity-20" />
-                <p>Open a video file to start text-based editing</p>
+                <div className="flex flex-col items-center text-zinc-700">
+                  <FileVideo size={64} className="mb-4 opacity-10" />
+                  <p className="text-sm">Video area</p>
+                </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Area: Controls & Timeline */}
+        <div className="bg-zinc-900 flex flex-col">
+          {/* Main Control Bar */}
+          <div className="h-16 px-6 flex items-center justify-between border-b border-zinc-800 bg-zinc-900/50">
+            {/* Left: Transcription & Cut Actions */}
+            <div className="flex items-center space-x-3 w-1/3">
+              <button
+                disabled={!project || isPreviewProcessing}
+                onClick={handleApply}
+                className="flex items-center space-x-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg text-sm font-semibold transition-colors disabled:opacity-30 border border-indigo-500/20"
+              >
+                {isPreviewProcessing ? (
+                  <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                ) : (
+                  <Zap size={14} className="fill-current" />
+                )}
+                <span>Apply & Preview</span>
+              </button>
+
+              <button 
+                disabled={!project}
+                onClick={deleteFillers}
+                className="flex items-center space-x-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                <span>Auto-Cut Silence</span>
+              </button>
+            </div>
+
+            {/* Center: Video Playback Controls */}
+            <div className="flex items-center justify-center space-x-4 w-1/3">
+              <button 
+                onClick={togglePlay}
+                className="p-2.5 bg-indigo-600 text-white rounded-full hover:scale-105 transition-transform"
+              >
+                <Play size={18} fill="currentColor" />
+              </button>
+              <div className="flex items-center">
+                <span className="text-sm font-mono tabular-nums text-white">
+                  {currentTime.toFixed(1)} <span className="text-zinc-500 mx-1">/</span> {project?.duration.toFixed(1) || '0.0'}s
+                </span>
+              </div>
+            </div>
+
+            {/* Right: View & Zoom Controls */}
+            <div className="flex items-center justify-end space-x-4 w-1/3">
+              <div className="flex items-center space-x-2 bg-zinc-800 rounded-lg px-3 py-1.5">
+                <Search size={14} className="text-zinc-500" />
+                <input 
+                  type="range" min="1" max="100" step="1"
+                  value={timelineZoom * 10}
+                  onChange={(e) => setTimelineZoom(parseInt(e.target.value) / 10)}
+                  className="w-24 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                />
+                <span className="text-[10px] text-zinc-500 font-mono w-6">{timelineZoom.toFixed(1)}x</span>
+              </div>
+              <button 
+                onClick={() => setShowTimeline(!showTimeline)}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${showTimeline ? 'bg-zinc-800 text-zinc-400' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'}`}
+              >
+                {showTimeline ? <span>Hide Timeline</span> : <span>Show Timeline</span>}
+              </button>
+            </div>
+          </div>
+
+          {/* Timeline / Progress Bar Area */}
+          <div className="relative">
+            {showTimeline ? (
+              project && (
+                <Timeline 
+                  segments={project.segments}
+                  duration={project.duration}
+                  currentTime={currentTime}
+                  onTimeClick={handleJumpToTime}
+                  zoom={timelineZoom}
+                />
+              )
+            ) : (
+              <div 
+                className="h-1 bg-zinc-800 cursor-pointer overflow-hidden group"
+                onClick={(e) => {
+                  if (!project) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  handleJumpToTime((x / rect.width) * project.duration);
+                }}
+              >
+                <div 
+                  className="h-full bg-indigo-500 transition-all duration-300"
+                  style={{ width: `${(currentTime / (project?.duration || 1)) * 100}%` }}
+                />
+                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100" />
               </div>
             )}
           </div>
-          
-          {project && (
-            <Timeline 
-              segments={project.segments}
-              duration={project.duration}
-              currentTime={currentTime}
-              onTimeClick={handleJumpToTime}
-            />
-          )}
         </div>
       </main>
     </div>
