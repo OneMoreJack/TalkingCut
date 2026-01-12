@@ -32,7 +32,7 @@ export interface VideoProject {
     paddingEnd: number;
     minSilenceDuration: number;
     crossfadeDuration: number;
-    breakGap: number; // Gap threshold for line breaks in transcript (default: 1.0s)
+    silenceThreshold: number; // Threshold for both line breaks and auto-cut (default: 1.0s)
   };
 }
 

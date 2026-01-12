@@ -74,19 +74,20 @@ export const generateFFmpegCommand = (project: VideoProject, outputPath: string)
   filter += `${vConcatInput}concat=n=${cuts.length}:v=1:a=0[outv]; `;
 
   // 3. Chain audio segments with crossfades
-  // acrossfade only works between two inputs, so we chain them.
-  // [a0][a1]acrossfade=d=0.02[ax1]; [ax1][a2]acrossfade=d=0.02[ax2]...
   if (cuts.length === 1) {
-    filter += `[a0]copy[outa]`;
+    filter += `[a0]anull[outa]`;
   } else {
     let lastAudio = '[a0]';
     for (let i = 1; i < cuts.length; i++) {
-      const nextOutput = (i === cuts.length - 1) ? '[outa]' : `[ax${i}]`;
-      filter += `${lastAudio}[a${i}]acrossfade=d=${crossfadeDuration}:curve1=exp:curve2=exp${nextOutput}; `;
+      const isLast = i === cuts.length - 1;
+      const nextOutput = isLast ? '[outa]' : `[ax${i}]`;
+      filter += `${lastAudio}[a${i}]acrossfade=d=${crossfadeDuration}:curve1=exp:curve2=exp${nextOutput}${isLast ? '' : '; '}`;
       lastAudio = `[ax${i}]`;
     }
   }
 
   // Final command
-  return `ffmpeg -i "${project.videoPath}" -filter_complex "${filter.trim()}" -map "[outv]" -map "[outa]" -c:v libx264 -preset superfast -c:a aac -b:a 192k "${outputPath}"`;
+  // Trim trailing semicolon if any (though we handled it above)
+  const finalFilter = filter.trim().replace(/;$/, '');
+  return `ffmpeg -i "${project.videoPath}" -filter_complex "${finalFilter}" -map "[outv]" -map "[outa]" -c:v libx264 -preset superfast -c:a aac -b:a 192k "${outputPath}"`;
 };

@@ -166,49 +166,81 @@ const WordEditor: React.FC<WordEditorProps> = ({
         </div>
       )}
 
-      {/* Continuous flowing text - no sentence grouping */}
-      <p className="text-lg leading-relaxed text-zinc-300 tracking-normal">
-        {uniqueSegments.map((word) => {
-          // Handle silence blocks
-          if (word.type === WordType.SILENCE) {
-            return renderSilence(word);
+      {/* Continuous flowing text grouped by segments for line breaks */}
+      {/* Continuous flowing text grouped by segments for line breaks */}
+      <div className="space-y-4">
+        {useMemo(() => {
+          const lines: WordSegment[][] = [];
+          let currentLine: WordSegment[] = [];
+          
+          uniqueSegments.forEach((word) => {
+            currentLine.push(word);
+            
+            // Dynamic Line Break Logic:
+            // 1. If it's a silence and duration >= breakGap
+            // 2. If it's the last word (isLastInSegment from backend handles punctuation-based breaks)
+            const shouldBreak = word.type === WordType.SILENCE 
+              ? word.duration! >= breakGap 
+              : word.isLastInSegment && !uniqueSegments.find(next => next.start === word.end && next.type === WordType.SILENCE);
+              // Note: backend isLastInSegment is already optimized to NOT break if followed by silence.
+
+            if (shouldBreak) {
+              lines.push(currentLine);
+              currentLine = [];
+            }
+          });
+          
+          if (currentLine.length > 0) {
+            lines.push(currentLine);
           }
-
-          const isActive = currentTime >= word.start && currentTime < word.end;
-          const isMatched = searchTerm && word.text.toLowerCase().includes(searchTerm.toLowerCase());
           
-          const activeStyle = isActive 
-            ? 'bg-indigo-500/30 text-indigo-200 font-medium' 
-            : '';
-          
-          const deletedStyle = word.deleted 
-              ? 'line-through decoration-zinc-600 text-zinc-600 decoration-2' 
-              : 'hover:text-zinc-100';
+          return lines.map((line, lineIdx) => (
+            <p 
+              key={lineIdx} 
+              className="text-lg leading-snug text-zinc-300 tracking-normal selection:bg-indigo-500/40 selection:text-white"
+            >
+              {line.map((word) => {
+                // Handle silence blocks
+                if (word.type === WordType.SILENCE) {
+                  return renderSilence(word);
+                }
 
-          const matchedStyle = !isActive && isMatched 
-            ? 'bg-yellow-500/20 text-yellow-200' 
-            : '';
+                const isActive = currentTime >= word.start && currentTime < word.end;
+                const isMatched = searchTerm && word.text.toLowerCase().includes(searchTerm.toLowerCase());
+                
+                const activeStyle = isActive 
+                  ? 'bg-indigo-500/30 text-indigo-200 font-medium' 
+                  : '';
+                
+                const deletedStyle = word.deleted 
+                    ? 'line-through decoration-zinc-600 text-zinc-600 decoration-2' 
+                    : 'hover:text-zinc-100';
 
-          return (
-            <React.Fragment key={word.id}>
-              <span
-                data-word-id={word.id}
-                onClick={() => onWordClick(word.start)}
-                className={`
-                  cursor-text transition-colors duration-150 rounded-sm
-                  ${activeStyle}
-                  ${deletedStyle}
-                  ${matchedStyle}
-                  selection:bg-teal-900 selection:text-teal-100
-                `}
-              >
-                {word.text}
-              </span>
-              {word.hasTrailingSpace && ' '}
-            </React.Fragment>
-          );
-        })}
-      </p>
+                const matchedStyle = !isActive && isMatched 
+                  ? 'bg-yellow-500/20 text-yellow-200' 
+                  : '';
+
+                return (
+                  <span
+                    key={word.id}
+                    data-word-id={word.id}
+                    onClick={() => onWordClick(word.start)}
+                    className={`
+                      inline-flex items-center cursor-text transition-colors duration-150 rounded-sm
+                      ${activeStyle}
+                      ${deletedStyle}
+                      ${matchedStyle}
+                    `}
+                  >
+                    {word.text}
+                    {word.hasTrailingSpace && <span className="opacity-0 w-[0.25em]"> </span>}
+                  </span>
+                );
+              })}
+            </p>
+          ));
+        }, [uniqueSegments, currentTime, searchTerm, breakGap])}
+      </div>
     </div>
   );
 };

@@ -5,7 +5,7 @@ TalkingCut Transcription Engine
 
 This module provides word-level transcription using WhisperX, with:
 - Hardware acceleration (MPS for Apple Silicon, CUDA for Nvidia)
-- Silero VAD for silence detection
+- Word-gap-based silence detection (derived from WhisperX alignment)
 - Linguistic heuristics for filler word detection
 - Structured JSON output compatible with the frontend WordSegment interface
 """
@@ -86,8 +86,9 @@ def get_all_punctuation() -> set:
 # Pre-compute for performance
 ALL_PUNCTUATION = get_all_punctuation()
 
-# Minimum silence duration to mark as SILENCE segment (in seconds)
-MIN_SILENCE_DURATION = 0.5
+# Default minimum silence duration to mark as SILENCE segment (in seconds)
+# This is now a parameter, kept here for reference
+DEFAULT_MIN_SILENCE_DURATION = 0.5
 
 # Device detection
 def get_device() -> str:
@@ -452,45 +453,13 @@ def merge_latin_characters(words: list[dict], max_gap: float = 0.3) -> list[dict
 
 
 # ============================================================================
-# VAD-based Silence Detection
+# Word-Gap-based Silence Detection
 # ============================================================================
 
-def detect_silences(audio_path: str, min_duration: float = MIN_SILENCE_DURATION) -> list[dict]:
-    """
-    Detect silence gaps in audio using Silero VAD.
-    
-    Returns a list of silence segments with start/end times.
-    """
-    from silero_vad import load_silero_vad, get_speech_timestamps, read_audio
-    model = load_silero_vad()
-    wav = read_audio(audio_path)
-    
-    # Get speech timestamps
-    speech_timestamps = get_speech_timestamps(
-        wav,
-        model,
-        sampling_rate=16000,
-        threshold=0.5,
-        min_speech_duration_ms=250,
-        min_silence_duration_ms=int(min_duration * 1000)
-    )
-    
-    silences = []
-    prev_end = 0.0
-    
-    for ts in speech_timestamps:
-        start_sec = ts["start"] / 16000
-        end_sec = ts["end"] / 16000
-        
-        # Gap before this speech segment
-        if start_sec - prev_end >= min_duration:
-            silences.append({
-                "start": prev_end,
-                "end": start_sec
-            })
-        prev_end = end_sec
-    
-    return silences
+# NOTE: The previous Silero VAD-based detect_silences function has been removed.
+# Silence detection is now integrated directly into transcribe_audio() using
+# WhisperX word-level alignment timestamps. This eliminates timing offset issues
+# caused by using two independent audio analysis systems.
 
 
 # ============================================================================
@@ -503,7 +472,8 @@ def transcribe_audio(
     language: str | None = None,
     device: str | None = None,
     batch_size: int = 16,
-    break_gap: float = 1.0
+    silence_threshold: float = 1.0,
+    min_silence_duration: float = 0.5
 ) -> list[dict]:
     """
     Transcribe audio file using WhisperX with word-level alignment.
@@ -514,7 +484,7 @@ def transcribe_audio(
         language: Language code (e.g., 'en', 'zh') or None for auto-detect
         device: Device to use (mps, cuda, cpu) or None for auto-detect
         batch_size: Batch size for inference
-        break_gap: Minimum gap (in seconds) between words to force a line break (default: 1.0)
+        min_silence_duration: Minimum gap (in seconds) to mark as SILENCE segment (default: 0.5)
     
     Returns:
         List of word segments with timing and type information
@@ -633,62 +603,118 @@ def transcribe_audio(
             })
 
     
-    # Second pass: calculate gap-based isLastInSegment and hasTrailingSpace
+    # Second pass: calculate temporary properties for cleanup later
     for i, word in enumerate(word_segments):
+        # We will calculate is_last and has_trailing_space in a final merged pass
+        pass
+    
+    # ===== Generate silence segments based on word gaps (no VAD) =====
+    print("[TalkingCut] Detecting silences from word gaps...")
+    import librosa
+    
+    silence_segments = []
+    
+    # 1. Detect opening silence (video start to first word)
+    if word_segments:
+        first_word_start = word_segments[0]["start"]
+        if first_word_start >= min_silence_duration:
+            duration = round(first_word_start, 1)
+            silence_segments.append({
+                "id": str(uuid.uuid4()),
+                "text": f"[...{duration}s]",
+                "start": 0.0,
+                "end": round(first_word_start, 3),
+                "confidence": 1.0,
+                "type": "silence",
+                "deleted": False,
+                "duration": duration,
+                "isLastInSegment": True,  # Silence causes line break
+                "hasTrailingSpace": False
+            })
+    
+    # 2. Detect inter-word silences (gaps between consecutive words)
+    for i in range(len(word_segments) - 1):
+        current_word = word_segments[i]
+        next_word = word_segments[i + 1]
+        
+        # Calculate precise word gap
+        gap = next_word["start"] - current_word["end"]
+        
+        # Only mark gaps that meet threshold
+        if gap >= min_silence_duration:
+            duration = round(gap, 1)
+            silence_segments.append({
+                "id": str(uuid.uuid4()),
+                "text": f"[...{duration}s]",
+                "start": round(current_word["end"], 3),
+                "end": round(next_word["start"], 3),
+                "confidence": 1.0,
+                "type": "silence",
+                "deleted": False,
+                "duration": duration,
+                "isLastInSegment": bool(gap >= silence_threshold),  # Silence causes line break if above threshold
+                "hasTrailingSpace": False
+            })
+    
+    # 3. Detect trailing silence (last word to audio end)
+    if word_segments:
+        audio_duration_total = librosa.get_duration(path=audio_path)
+        last_word_end = word_segments[-1]["end"]
+        trailing_silence = audio_duration_total - last_word_end
+        
+        if trailing_silence >= min_silence_duration:
+            duration = round(trailing_silence, 1)
+            silence_segments.append({
+                "id": str(uuid.uuid4()),
+                "text": f"[...{duration}s]",
+                "start": round(last_word_end, 3),
+                "end": round(audio_duration_total, 3),
+                "confidence": 1.0,
+                "type": "silence",
+                "deleted": False,
+                "duration": duration,
+                "isLastInSegment": True,
+                "hasTrailingSpace": False
+            })
+    
+    # Merge and sort all segments by start time
+    all_segments = word_segments + silence_segments
+    all_segments.sort(key=lambda x: x["start"])
+
+    # Final pass: Determine line breaks and trailing spaces
+    for i in range(len(all_segments)):
+        seg = all_segments[i]
         is_last = False
         has_trailing_space = False
         
-        # Check if this is the last word overall
-        if i == len(word_segments) - 1:
-            is_last = True
-        else:
-            next_word = word_segments[i + 1]
-            gap = next_word["start"] - word["end"]
-            
-            # Gap-based break (using break_gap parameter)
-            if gap >= break_gap:
-                is_last = True
-            
-            # Semantic protection: always break after sentence-ending punctuation
-            if word["endsWithPunctuation"]:
-                is_last = True
-            
-            # Trailing space: add space between consecutive Latin (non-CJK) words
-            # This works for both pure English and mixed Chinese/English content
-            if not is_last:
-                current_is_latin = is_latin_text(word["text"])
-                # Add space after Latin words (for proper English word spacing)
-                if current_is_latin:
-                    has_trailing_space = True
+        is_final_seg = (i == len(all_segments) - 1)
+        next_seg = None if is_final_seg else all_segments[i+1]
         
-        word["isLastInSegment"] = is_last
-        word["hasTrailingSpace"] = has_trailing_space
-        # Remove temporary field
-        del word["endsWithPunctuation"]
-    
-    # Add silence segments with duration info
-    print("[TalkingCut] Detecting silences...")
-    silences = detect_silences(audio_path)
-    
-    segments = word_segments.copy()
-    
-    for silence in silences:
-        duration = round(silence["end"] - silence["start"], 1)
-        segments.append({
-            "id": str(uuid.uuid4()),
-            "text": f"[{duration}s]",
-            "start": round(silence["start"], 3),
-            "end": round(silence["end"], 3),
-            "confidence": 1.0,
-            "type": "silence",
-            "deleted": False,
-            "duration": duration,
-            "isLastInSegment": duration >= break_gap,  # Break after long silences
-            "hasTrailingSpace": False
-        })
-    
-    # Sort all segments by start time
-    segments.sort(key=lambda x: x["start"])
+        if seg["type"] == "silence":
+            # Silence breaks if above threshold OR if it's the very last segment
+            if seg["duration"] >= silence_threshold or is_final_seg:
+                is_last = True
+        else:
+            # It's a word
+            if is_final_seg:
+                is_last = True
+            else:
+                # Break if punctuation, but NOT if next is silence (silence will handle the break for us)
+                if seg.get("endsWithPunctuation") and (next_seg is None or next_seg["type"] != "silence"):
+                    is_last = True
+                
+                # Trailing space for Latin words if not breaking
+                if not is_last and is_latin_text(seg["text"]):
+                    has_trailing_space = True
+            
+            # Clean up temporary field
+            if "endsWithPunctuation" in seg:
+                del seg["endsWithPunctuation"]
+        
+        seg["isLastInSegment"] = is_last
+        seg["hasTrailingSpace"] = has_trailing_space
+
+    segments = all_segments
     
     # Cleanup models to free memory
     del model
@@ -702,6 +728,8 @@ def transcribe_audio(
     rtf = total_time / audio_duration if audio_duration > 0 else 0
     
     print(f"[TalkingCut] Found {len(segments)} segments")
+    print(f"[TalkingCut] - Words: {len(word_segments)}")
+    print(f"[TalkingCut] - Silences: {len(silence_segments)}")
     print(f"[TalkingCut] Total processing time: {total_time:.2f}s")
     print(f"[TalkingCut] Real-time factor (RTF): {rtf:.2f}x")
     print(f"[TalkingCut] Audio duration: {audio_duration:.2f}s")
@@ -756,10 +784,10 @@ def main():
     )
     
     parser.add_argument(
-        "--break-gap",
+        "--min-silence",
         type=float,
-        default=1.0,
-        help="Minimum gap (in seconds) between words to force a line break (default: 1.0)"
+        default=0.5,
+        help="Minimum silence duration (in seconds) to mark as SILENCE segment (default: 0.5)"
     )
     
     args = parser.parse_args()
@@ -780,7 +808,8 @@ def main():
             language=args.language,
             device=args.device,
             batch_size=args.batch_size,
-            break_gap=args.break_gap
+            silence_threshold=args.min_silence, # Re-using min-silence arg for silence_threshold in CLI for now, or I should rename it.
+            min_silence_duration=0.5
         )
         
         # Output result

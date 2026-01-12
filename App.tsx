@@ -94,9 +94,25 @@ const App: React.FC = () => {
         if (buffer) {
           const blob = new Blob([buffer], { type: 'video/mp4' });
           const url = URL.createObjectURL(blob);
+          
+          if (videoRef.current) {
+            videoRef.current.pause();
+          }
+          
           setVideoSrc(url);
           setIsPreviewMode(true);
+          setCurrentTime(0);
+          
+          // Force video reload
+          setTimeout(() => {
+            if (videoRef.current) {
+              videoRef.current.load();
+              videoRef.current.play().catch(e => console.warn('Auto-play blocked:', e));
+            }
+          }, 100);
         }
+      } else if (result.error) {
+         alert(`Preview failed: ${result.error}`);
       }
     } catch (error) {
       console.error('[App] Apply/Preview failed:', error);
@@ -254,24 +270,30 @@ const App: React.FC = () => {
                <span className="text-zinc-500 italic">Advanced settings hidden</span>
             </div>
             <div className="flex justify-between items-center text-sm">
-              <span className={!project ? "text-zinc-600" : ""}>Crossfade (s)</span>
-              <input 
-                disabled={!project}
-                type="number" step="0.01" min="0" max="1"
-                className="w-16 bg-zinc-800 rounded px-2 py-1 outline-none focus:ring-1 ring-indigo-500 disabled:opacity-50"
-                value={project?.settings.crossfadeDuration ?? 0.02}
-                onChange={(e) => updateSettings({ crossfadeDuration: parseFloat(e.target.value) })}
-              />
+              <span className={!project ? "text-zinc-600" : ""}>Crossfade</span>
+              <div className="flex items-center bg-zinc-800 rounded px-2 py-0.5">
+                <input 
+                  disabled={!project}
+                  type="number" step="0.01" min="0" max="1"
+                  className="w-12 bg-transparent outline-none focus:ring-0 text-right disabled:opacity-50"
+                  value={project?.settings.crossfadeDuration ?? 0.02}
+                  onChange={(e) => updateSettings({ crossfadeDuration: parseFloat(e.target.value) || 0.02 })}
+                />
+                <span className="text-zinc-500 ml-1 text-xs">s</span>
+              </div>
             </div>
             <div className="flex justify-between items-center text-sm">
-              <span className={!project ? "text-zinc-600" : ""}>Break Gap (s)</span>
-              <input 
-                disabled={!project}
-                type="number" step="0.1" min="0.1" max="5"
-                className="w-16 bg-zinc-800 rounded px-2 py-1 outline-none focus:ring-1 ring-indigo-500 disabled:opacity-50"
-                value={project?.settings.breakGap ?? 1.0}
-                onChange={(e) => updateSettings({ breakGap: parseFloat(e.target.value) || 1.0 })}
-              />
+              <span className={!project ? "text-zinc-600" : ""}>Silence Threshold</span>
+              <div className="flex items-center bg-zinc-800 rounded px-2 py-0.5">
+                <input 
+                  disabled={!project}
+                  type="number" step="0.1" min="0.1" max="10"
+                  className="w-12 bg-transparent outline-none focus:ring-0 text-right disabled:opacity-50"
+                  value={project?.settings.silenceThreshold ?? 1.0}
+                  onChange={(e) => updateSettings({ silenceThreshold: parseFloat(e.target.value) || 1.0 })}
+                />
+                <span className="text-zinc-500 ml-1 text-xs">s</span>
+              </div>
             </div>
           </div>
 
@@ -352,7 +374,7 @@ const App: React.FC = () => {
                 onToggleWordsDelete={toggleWordsDelete}
                 onWordClick={handleJumpToTime}
                 searchTerm={searchTerm}
-                breakGap={project.settings.breakGap ?? 1.0}
+                breakGap={project.settings.silenceThreshold ?? 1.0}
               />
             )}
           </div>

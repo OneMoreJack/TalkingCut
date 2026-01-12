@@ -67,7 +67,7 @@ export const useProject = () => {
           videoPath,
           duration: result.segments.length > 0 ? result.segments[result.segments.length - 1].end : 0,
           segments: result.segments as any,
-          settings: { paddingStart: 0.1, paddingEnd: 0.1, minSilenceDuration: 0.5, crossfadeDuration: 0.02, breakGap: 1.0 }
+          settings: { paddingStart: 0.1, paddingEnd: 0.1, minSilenceDuration: 0.5, crossfadeDuration: 0.02, silenceThreshold: 1.0 }
         });
         setStatus({ step: 'idle', progress: 100, message: 'Done' });
         setHistory([]);
@@ -133,7 +133,7 @@ export const useProject = () => {
     setProject({
       ...project,
       segments: project.segments.map(s =>
-        s.type === WordType.FILLER || (s.type === WordType.SILENCE && (s.end - s.start) > 0.5)
+        s.type === WordType.FILLER || (s.type === WordType.SILENCE && (s.end - s.start) >= (project.settings.silenceThreshold ?? 1.0))
           ? { ...s, deleted: true }
           : s
       )
