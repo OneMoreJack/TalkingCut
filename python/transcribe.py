@@ -41,6 +41,51 @@ FILLER_WORDS = {
     }
 }
 
+# Punctuation configuration for different languages
+# Organized by category for easy maintenance and extension
+PUNCTUATION_CONFIG = {
+    # English punctuation
+    "en": {
+        # Sentence-ending punctuation
+        "terminal": ".!?",
+        # Pairing punctuation (quotes, brackets)
+        "pairing": "\"'()[]{}<>",
+        # Separating punctuation
+        "separating": ",;:-–—/\\",
+        # Special symbols
+        "special": "@#$%^&*_+=|~`",
+    },
+    # Chinese punctuation
+    "zh": {
+        # Sentence-ending punctuation
+        "terminal": "。！？",
+        # Pairing punctuation (quotes, brackets)
+        "pairing": '""''（）【】《》「」『』〈〉',
+        # Separating punctuation  
+        "separating": "，、；：—…·",
+        # Special (less common)
+        "special": "～￥",
+    },
+    # Japanese punctuation (for future extension)
+    "ja": {
+        "terminal": "。！？",
+        "pairing": "「」『』（）【】",
+        "separating": "、，：；",
+        "special": "〜・",
+    },
+}
+
+def get_all_punctuation() -> set:
+    """Get all punctuation characters from all languages."""
+    all_punct = set()
+    for lang_config in PUNCTUATION_CONFIG.values():
+        for category_chars in lang_config.values():
+            all_punct.update(category_chars)
+    return all_punct
+
+# Pre-compute for performance
+ALL_PUNCTUATION = get_all_punctuation()
+
 # Minimum silence duration to mark as SILENCE segment (in seconds)
 MIN_SILENCE_DURATION = 0.5
 
@@ -89,6 +134,321 @@ def is_filler_word(text: str, language: str = "en") -> bool:
         return cleaned in FILLER_WORDS.get("zh", set())
     else:
         return cleaned in FILLER_WORDS.get("en", set())
+
+
+def is_latin_text(text: str) -> bool:
+    """
+    Check if text contains only Latin characters (no CJK).
+    Used for determining word spacing in mixed-language transcripts.
+    """
+    # Remove punctuation for check
+    cleaned = re.sub(r'[^\w]', '', text)
+    if not cleaned:
+        return False
+    # Check if any CJK characters present
+    return not bool(re.search(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]', cleaned))
+
+
+def is_single_latin_char(text: str) -> bool:
+    """Check if text is a single Latin character (letter only, no punctuation)."""
+    return len(text) == 1 and text.isalpha() and ord(text) < 128
+
+def is_punctuation(c: str) -> bool:
+    """Check if character is punctuation (supports multiple languages)."""
+    return c in ALL_PUNCTUATION
+
+
+def tokenize_mixed_text(text: str) -> list[str]:
+    """
+    Tokenize mixed CJK/Latin text by splitting on:
+    1. Whitespace
+    2. CJK/Latin character boundaries
+    3. Case transitions in Latin text (e.g., 'lightI' -> ['light', 'I'])
+    4. Punctuation boundaries (consecutive punctuation grouped together)
+    
+    Returns a list of tokens (individual CJK chars, Latin words, or punctuation groups).
+    """
+    import re
+    
+    tokens = []
+    current_token = ""
+    prev_type = None  # 'cjk', 'latin_lower', 'latin_upper', 'punct', 'other'
+    
+    def get_char_type(c: str) -> str:
+        if re.match(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]', c):
+            return 'cjk'
+        elif c.isupper() and c.isalpha():
+            return 'latin_upper'
+        elif c.islower() and c.isalpha():
+            return 'latin_lower' 
+        elif c.isspace():
+            return 'space'
+        elif is_punctuation(c):
+            return 'punct'
+        else:
+            return 'other'
+    
+    for c in text:
+        char_type = get_char_type(c)
+        
+        if char_type == 'space':
+            # Finish current token
+            if current_token:
+                tokens.append(current_token)
+                current_token = ""
+            prev_type = None
+            continue
+        
+        if char_type == 'cjk':
+            # Each CJK character is its own token
+            if current_token:
+                tokens.append(current_token)
+                current_token = ""
+            tokens.append(c)
+            prev_type = 'cjk'
+        elif char_type in ('latin_lower', 'latin_upper'):
+            # Check for word boundary
+            if prev_type == 'cjk' or prev_type == 'punct':
+                # Transition from CJK/punct to Latin - start new token
+                if current_token:
+                    tokens.append(current_token)
+                current_token = c
+            elif prev_type == 'latin_lower' and char_type == 'latin_upper':
+                # Lowercase to uppercase transition (e.g., 'lightI')
+                if current_token:
+                    tokens.append(current_token)
+                current_token = c
+            else:
+                current_token += c
+            prev_type = char_type
+        elif char_type == 'punct':
+            # Group consecutive punctuation together (e.g., '...' or '?!')
+            if prev_type == 'punct':
+                # Same type, append to current
+                current_token += c
+            else:
+                # Different type, start new token
+                if current_token:
+                    tokens.append(current_token)
+                current_token = c
+            prev_type = 'punct'
+        else:
+            # Other characters (numbers, etc.)
+            if prev_type == 'cjk':
+                if current_token:
+                    tokens.append(current_token)
+                    current_token = ""
+                tokens.append(c)
+            elif prev_type == 'punct':
+                if current_token:
+                    tokens.append(current_token)
+                current_token = c
+            elif current_token:
+                current_token += c
+            else:
+                current_token = c
+            prev_type = 'other'
+    
+    # Don't forget the last token
+    if current_token:
+        tokens.append(current_token)
+    
+    return tokens
+
+
+def reconstruct_words_from_text(words: list[dict], original_text: str) -> list[dict]:
+    """
+    Reconstruct proper English words using the original segment text as reference.
+    
+    WhisperX's Chinese alignment model splits English words into individual
+    characters. This function uses the original transcription text to reconstruct
+    words by:
+    1. Smart tokenization that handles CJK/Latin boundaries
+    2. Matching aligned characters to tokens
+    3. Creating merged word entries with proper timing
+    
+    Args:
+        words: List of word dicts from WhisperX alignment (character-level)
+        original_text: Original segment text from Whisper
+    
+    Returns:
+        List of word dicts with proper word boundaries
+    """
+    if not words or not original_text:
+        return words
+    
+    import re
+    
+    # Smart tokenization that handles mixed text
+    tokens = tokenize_mixed_text(original_text)
+    
+    result = []
+    word_idx = 0  # Index in the aligned words array
+    
+    for token in tokens:
+        if word_idx >= len(words):
+            break
+        
+        # Check if this token is a CJK character
+        is_cjk_char = len(token) == 1 and bool(re.match(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]', token))
+        
+        if is_cjk_char:
+            # For CJK, match single character
+            current_word = words[word_idx]
+            current_text = current_word.get("word", "").strip()
+            
+            if current_text == token:
+                result.append(current_word)
+                word_idx += 1
+            elif len(current_text) == 1:
+                # Mismatch but still single char, add it
+                result.append(current_word)
+                word_idx += 1
+        elif token.isalpha():
+            # Latin word - collect characters
+            collected_chars = []
+            start_time = None
+            end_time = None
+            total_score = 0
+            char_count = 0
+            
+            target_chars = token.lower()
+            collected_lower = ""
+            
+            while word_idx < len(words) and len(collected_lower) < len(target_chars):
+                current_word = words[word_idx]
+                current_text = current_word.get("word", "").strip()
+                
+                if is_single_latin_char(current_text):
+                    collected_chars.append(current_text)
+                    collected_lower += current_text.lower()
+                    
+                    if start_time is None:
+                        start_time = current_word.get("start", 0)
+                    end_time = current_word.get("end", 0)
+                    total_score += current_word.get("score", 0)
+                    char_count += 1
+                    word_idx += 1
+                else:
+                    # Not a single Latin char, stop collecting
+                    break
+            
+            # Create merged word
+            if collected_chars:
+                result.append({
+                    "word": "".join(collected_chars),
+                    "start": start_time or 0,
+                    "end": end_time or 0,
+                    "score": total_score / char_count if char_count > 0 else 0
+                })
+        else:
+            # Punctuation group (e.g., '...') - collect matching punctuation marks
+            if all(is_punctuation(c) for c in token):
+                # Collect consecutive punctuation marks
+                collected_punct = []
+                start_time = None
+                end_time = None
+                
+                for expected_char in token:
+                    if word_idx >= len(words):
+                        break
+                    current_word = words[word_idx]
+                    current_text = current_word.get("word", "").strip()
+                    
+                    if current_text == expected_char or is_punctuation(current_text):
+                        collected_punct.append(current_text)
+                        if start_time is None:
+                            start_time = current_word.get("start", 0)
+                        end_time = current_word.get("end", 0)
+                        word_idx += 1
+                
+                if collected_punct:
+                    result.append({
+                        "word": "".join(collected_punct),
+                        "start": start_time or 0,
+                        "end": end_time or 0,
+                        "score": 1.0
+                    })
+            else:
+                # Other tokens - try to match or skip
+                current_word = words[word_idx]
+                current_text = current_word.get("word", "").strip()
+                
+                if current_text == token or (len(token) == 1 and len(current_text) == 1):
+                    result.append(current_word)
+                    word_idx += 1
+    
+    # Add any remaining words
+    while word_idx < len(words):
+        result.append(words[word_idx])
+        word_idx += 1
+    
+    return result
+
+
+def merge_latin_characters(words: list[dict], max_gap: float = 0.3) -> list[dict]:
+    """
+    Simple fallback: merge consecutive single Latin characters based on time gaps.
+    This is used when we don't have the original text available.
+    """
+    if not words:
+        return words
+    
+    merged = []
+    i = 0
+    
+    while i < len(words):
+        word = words[i]
+        word_text = word.get("word", "").strip()
+        
+        # If not a single Latin character, add as-is
+        if not is_single_latin_char(word_text):
+            merged.append(word)
+            i += 1
+            continue
+        
+        # Start collecting Latin characters
+        collected_chars = [word_text]
+        start_time = word.get("start", 0)
+        end_time = word.get("end", 0)
+        total_score = word.get("score", 0)
+        char_count = 1
+        
+        # Look ahead and collect more characters
+        j = i + 1
+        while j < len(words):
+            next_word = words[j]
+            next_text = next_word.get("word", "").strip()
+            next_start = next_word.get("start", 0)
+            
+            # Check if next is also a single Latin character
+            if not is_single_latin_char(next_text):
+                break
+            
+            # Check time gap - if too large, it's a new word
+            gap = next_start - end_time
+            if gap > max_gap:
+                break
+            
+            # Add to current word
+            collected_chars.append(next_text)
+            end_time = next_word.get("end", 0)
+            total_score += next_word.get("score", 0)
+            char_count += 1
+            j += 1
+        
+        # Create merged word
+        merged_text = "".join(collected_chars)
+        merged.append({
+            "word": merged_text,
+            "start": start_time,
+            "end": end_time,
+            "score": total_score / char_count if char_count > 0 else 0
+        })
+        
+        i = j
+    
+    return merged
 
 
 # ============================================================================
@@ -229,6 +589,15 @@ def transcribe_audio(
     align_time = time.time() - align_start
     print(f"[TalkingCut] Alignment completed in {align_time:.2f}s")
     
+    # Post-process: reconstruct English words using original text as reference
+    # This fixes WhisperX Chinese alignment splitting English into characters
+    print("[TalkingCut] Reconstructing word boundaries...")
+    for segment in aligned.get("segments", []):
+        if "words" in segment:
+            original_text = segment.get("text", "")
+            segment["words"] = reconstruct_words_from_text(segment["words"], original_text)
+
+    
     # Process segments - first pass: collect all word segments
     word_segments = []
     
@@ -262,6 +631,7 @@ def transcribe_audio(
                 # Language info for frontend
                 "language": detected_language
             })
+
     
     # Second pass: calculate gap-based isLastInSegment and hasTrailingSpace
     for i, word in enumerate(word_segments):
@@ -283,9 +653,13 @@ def transcribe_audio(
             if word["endsWithPunctuation"]:
                 is_last = True
             
-            # Trailing space for English (add space unless it's the last word in sentence)
-            if detected_language == "en" and not is_last:
-                has_trailing_space = True
+            # Trailing space: add space between consecutive Latin (non-CJK) words
+            # This works for both pure English and mixed Chinese/English content
+            if not is_last:
+                current_is_latin = is_latin_text(word["text"])
+                # Add space after Latin words (for proper English word spacing)
+                if current_is_latin:
+                    has_trailing_space = True
         
         word["isLastInSegment"] = is_last
         word["hasTrailingSpace"] = has_trailing_space
