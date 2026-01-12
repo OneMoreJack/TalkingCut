@@ -85,17 +85,14 @@ const App: React.FC = () => {
   const handleApply = async () => {
     if (!project) return;
     
-    // Toggle Live Preview
-    if (isPreviewMode) {
-      exitPreview();
-    } else {
-      setIsPreviewMode(true);
-      // Optional: Jump to the start of the first cut if we're not already in one
-      const cut = activeCuts.find(c => currentTime >= c.start && currentTime < c.end);
-      if (!cut && activeCuts.length > 0) {
-        handleJumpToTime(activeCuts[0].start);
-      }
+    // Always enable live preview and restart playback
+    setIsPreviewMode(true);
+    
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(e => console.warn('Play blocked:', e));
     }
+    setCurrentTime(0);
   };
 
   const exitPreview = () => {
@@ -395,7 +392,7 @@ const App: React.FC = () => {
                 <button 
                   disabled={!project}
                   onClick={handleExport}
-                  className="absolute top-4 right-4 flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50 shadow-2xl z-20"
+                  className="absolute top-2 right-2 flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50 shadow-2xl z-20"
                 >
                   <Download size={14} />
                   <span>Export Final Cut</span>
@@ -426,7 +423,7 @@ const App: React.FC = () => {
                 ) : (
                   <Zap size={14} className="fill-current" />
                 )}
-                <span>Apply & Preview</span>
+                <span>Apply</span>
               </button>
 
               <button 

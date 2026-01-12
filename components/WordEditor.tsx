@@ -1,4 +1,4 @@
-import { Trash2, Wand2 } from 'lucide-react';
+import { RotateCcw, Trash2, Wand2 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { WordSegment, WordType } from '../types/index';
 
@@ -24,6 +24,13 @@ const WordEditor: React.FC<WordEditorProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectionRect, setSelectionRect] = useState<{ top: number; left: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Check if the current selection is entirely deleted (for "Restore" toggle)
+  const isSelectionDeleted = useMemo(() => {
+    if (selectedIds.length === 0) return false;
+    const selectedSegments = segments.filter(s => selectedIds.includes(s.id));
+    return selectedSegments.length > 0 && selectedSegments.every(s => s.deleted);
+  }, [selectedIds, segments]);
 
   // Deduplicate segments
   const uniqueSegments = useMemo(() => {
@@ -146,8 +153,8 @@ const WordEditor: React.FC<WordEditorProps> = ({
               onClick={handleDeleteSelection}
               className="flex items-center space-x-2 px-3 py-2 hover:bg-zinc-700 text-zinc-300 transition-colors"
             >
-              <Trash2 size={14} />
-              <span className="text-xs font-medium">删除</span>
+              {isSelectionDeleted ? <RotateCcw size={14} className="text-zinc-400" /> : <Trash2 size={14} />}
+              <span className="text-xs font-medium">{isSelectionDeleted ? '恢复' : '删除'}</span>
             </button>
             
             <div className="w-[1px] h-4 bg-zinc-700"></div>
