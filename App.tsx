@@ -18,7 +18,7 @@ import Timeline from './components/Timeline';
 import WordEditor from './components/WordEditor';
 import { useModelDownload } from './hooks/useModelDownload';
 import { ModelSize, useProject } from './hooks/useProject';
-import { generateFFmpegCommand } from './services/ffmpegService';
+import { generateCutList, generateFFmpegCommand } from './services/ffmpegService';
 
 const App: React.FC = () => {
   const {
@@ -76,70 +76,32 @@ const App: React.FC = () => {
     });
   };
 
+  // Calculate the kept segments whenever project segments or settings change
+  const activeCuts = useMemo(() => {
+    if (!project) return [];
+    return generateCutList(project);
+  }, [project?.segments, project?.settings.paddingStart, project?.settings.paddingEnd]);
+
   const handleApply = async () => {
-    if (!project || !window.electronAPI) return;
+    if (!project) return;
     
-    setIsPreviewProcessing(true);
-    try {
-      const workspace = await window.electronAPI.temp.getWorkspace();
-      const tempPath = `${workspace}/preview_${Date.now()}.mp4`;
-      
-      const ffmpegCommand = generateFFmpegCommand(project, tempPath);
-      if (!ffmpegCommand) {
-        setIsPreviewProcessing(false);
-        return;
+    // Toggle Live Preview
+    if (isPreviewMode) {
+      exitPreview();
+    } else {
+      setIsPreviewMode(true);
+      // Optional: Jump to the start of the first cut if we're not already in one
+      const cut = activeCuts.find(c => currentTime >= c.start && currentTime < c.end);
+      if (!cut && activeCuts.length > 0) {
+        handleJumpToTime(activeCuts[0].start);
       }
-
-      const result = await window.electronAPI.export.start({
-        videoPath: project.videoPath,
-        outputPath: tempPath,
-        ffmpegCommand
-      });
-
-      if (result.success && result.outputPath) {
-        // Switch to preview video
-        if (!isPreviewMode) {
-          setOriginalVideoSrc(videoSrc);
-        }
-        
-        const buffer = await window.electronAPI.readVideoFile(result.outputPath);
-        if (buffer) {
-          const blob = new Blob([buffer], { type: 'video/mp4' });
-          const url = URL.createObjectURL(blob);
-          
-          if (videoRef.current) {
-            videoRef.current.pause();
-          }
-          
-          setVideoSrc(url);
-          setIsPreviewMode(true);
-          setCurrentTime(0);
-          
-          // Force video reload
-          setTimeout(() => {
-            if (videoRef.current) {
-              videoRef.current.load();
-              videoRef.current.play().catch(e => console.warn('Auto-play blocked:', e));
-            }
-          }, 100);
-        }
-      } else if (result.error) {
-         alert(`Preview failed: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('[App] Apply/Preview failed:', error);
-    } finally {
-      setIsPreviewProcessing(false);
     }
   };
 
   const exitPreview = () => {
-    if (originalVideoSrc) {
-      setVideoSrc(originalVideoSrc);
-      setOriginalVideoSrc(null);
-    }
     setIsPreviewMode(false);
   };
+
 
   // ... (Virtual Preview and keyboard shortcuts logic remains same)
 
@@ -386,9 +348,30 @@ const App: React.FC = () => {
                   className="max-w-full max-h-full rounded-lg shadow-2xl"
                   onLoadedMetadata={handleLoadedMetadata}
                   onClick={togglePlay}
-                  onTimeUpdate={() => {
+                  onTimeUpdate={(e) => {
+                      const v = e.currentTarget;
+                      const time = v.currentTime;
+                      
                       if (!skipFlag.current) {
-                        setCurrentTime(videoRef.current?.currentTime || 0);
+                        setCurrentTime(time);
+                      }
+
+                      // Live Preview Skipping Logic
+                      if (isPreviewMode && !skipFlag.current) {
+                        const inCut = activeCuts.some(cut => time >= cut.start && time < cut.end);
+                        if (!inCut) {
+                          const nextCut = activeCuts.find(cut => cut.start > time);
+                          if (nextCut) {
+                            skipFlag.current = true;
+                            v.currentTime = nextCut.start;
+                            setTimeout(() => { skipFlag.current = false; }, 50);
+                          } else if (activeCuts.length > 0) {
+                            // Hit end of all cuts
+                            v.pause();
+                            const lastCut = activeCuts[activeCuts.length - 1];
+                            v.currentTime = lastCut.end;
+                          }
+                        }
                       }
                   }}
                 />
