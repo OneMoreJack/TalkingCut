@@ -25,6 +25,7 @@ export interface VideoProject {
   id: string;
   name: string;
   videoPath: string;
+  audioPath?: string;
   duration: number;
   segments: WordSegment[];
   settings: {

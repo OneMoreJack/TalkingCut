@@ -51,6 +51,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showTimeline, setShowTimeline] = useState(true);
   const [timelineZoom, setTimelineZoom] = useState(1);
+  const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -151,8 +152,13 @@ const App: React.FC = () => {
   const handleJumpToTime = (time: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime = time;
-      videoRef.current.play();
+      videoRef.current.play().catch(e => console.warn('Play blocked:', e));
     }
+    setCurrentTime(time);
+  };
+
+  const handleSelectionChange = (range: { start: number; end: number } | null) => {
+    setSelectionRange(range);
   };
 
   const handleLoadedMetadata = () => {
@@ -325,6 +331,8 @@ const App: React.FC = () => {
                   onWordClick={handleJumpToTime}
                   searchTerm={searchTerm}
                   breakGap={project.settings.silenceThreshold ?? 1.0}
+                  selectionRange={selectionRange}
+                  onSelectionChange={handleSelectionChange}
                 />
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-zinc-600 p-8 text-center">
@@ -482,6 +490,9 @@ const App: React.FC = () => {
                   currentTime={currentTime}
                   onTimeClick={handleJumpToTime}
                   zoom={timelineZoom}
+                  audioPath={project.audioPath}
+                  selectionRange={selectionRange}
+                  onSelectionChange={handleSelectionChange}
                 />
               )
             ) : (

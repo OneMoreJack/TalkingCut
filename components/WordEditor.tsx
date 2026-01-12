@@ -10,6 +10,8 @@ interface WordEditorProps {
   onWordClick: (time: number) => void;
   searchTerm?: string;
   breakGap?: number;
+  selectionRange: { start: number; end: number } | null;
+  onSelectionChange: (range: { start: number; end: number } | null) => void;
 }
 
 const WordEditor: React.FC<WordEditorProps> = ({ 
@@ -19,7 +21,9 @@ const WordEditor: React.FC<WordEditorProps> = ({
   onToggleWordsDelete, 
   onWordClick, 
   searchTerm,
-  breakGap = 1.0 
+  breakGap = 1.0,
+  selectionRange,
+  onSelectionChange
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectionRect, setSelectionRect] = useState<{ top: number; left: number } | null>(null);
@@ -91,6 +95,16 @@ const WordEditor: React.FC<WordEditorProps> = ({
         top: rect.bottom - containerRect.top + 8,
         left: rect.left - containerRect.left + rect.width / 2
       });
+
+      // Calculate time range for timeline linkage
+      const selectedSegments = segments.filter(s => ids.includes(s.id));
+      if (selectedSegments.length > 0) {
+        const start = Math.min(...selectedSegments.map(s => s.start));
+        const end = Math.max(...selectedSegments.map(s => s.end));
+        onSelectionChange({ start, end });
+      }
+    } else {
+      onSelectionChange(null);
     }
   };
 
@@ -215,15 +229,21 @@ const WordEditor: React.FC<WordEditorProps> = ({
                 const isActive = currentTime >= word.start && currentTime < word.end;
                 const isMatched = searchTerm && word.text.toLowerCase().includes(searchTerm.toLowerCase());
                 
+                const isInSelection = selectionRange && word.start >= selectionRange.start && word.end <= selectionRange.end;
+
                 const activeStyle = isActive 
                   ? 'bg-indigo-500/30 text-indigo-200 font-medium' 
                   : '';
                 
+                const inSelectionStyle = isInSelection && !isActive
+                  ? 'bg-purple-500/20 text-purple-200'
+                  : '';
+
                 const deletedStyle = word.deleted 
                     ? 'line-through decoration-zinc-600 text-zinc-600 decoration-2' 
                     : 'hover:text-zinc-100';
 
-                const matchedStyle = !isActive && isMatched 
+                const matchedStyle = !isActive && !isInSelection && isMatched 
                   ? 'bg-yellow-500/20 text-yellow-200' 
                   : '';
 
@@ -235,6 +255,7 @@ const WordEditor: React.FC<WordEditorProps> = ({
                     className={`
                       inline-flex items-center cursor-text transition-colors duration-150 rounded-sm
                       ${activeStyle}
+                      ${inSelectionStyle}
                       ${deletedStyle}
                       ${matchedStyle}
                     `}

@@ -42,6 +42,7 @@ export interface WordSegment {
 export interface TranscribeResult {
   success: boolean;
   segments?: WordSegment[];
+  audioPath?: string;
   error?: string;
 }
 

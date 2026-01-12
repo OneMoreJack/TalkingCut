@@ -65,6 +65,7 @@ export const useProject = () => {
           id: Math.random().toString(36).substr(2, 9),
           name,
           videoPath,
+          audioPath: result.audioPath,
           duration: result.segments.length > 0 ? result.segments[result.segments.length - 1].end : 0,
           segments: result.segments as any,
           settings: { paddingStart: 0.1, paddingEnd: 0.1, minSilenceDuration: 0.5, crossfadeDuration: 0.02, silenceThreshold: 1.0 }

@@ -99,7 +99,8 @@ function setupIpcHandlers(): void {
     try {
       const fs = await import('fs/promises');
       const buffer = await fs.readFile(videoPath);
-      return buffer;
+      // Convert Node Buffer to ArrayBuffer for IPC transfer
+      return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
     } catch (error) {
       console.error('[Main] Failed to read video file:', error);
       return null;
@@ -141,7 +142,7 @@ function setupIpcHandlers(): void {
         }
       });
 
-      return { success: true, segments: result.segments };
+      return { success: true, segments: result.segments, audioPath };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
