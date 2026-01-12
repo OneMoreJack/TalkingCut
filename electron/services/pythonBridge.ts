@@ -8,7 +8,6 @@
 
 import { ChildProcess, spawn } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 
 export interface TranscribeOptions {
@@ -99,7 +98,8 @@ export class PythonBridge {
   async transcribe(audioPath: string, options: TranscribeOptions = {}): Promise<TranscribeResult> {
     return new Promise((resolve, reject) => {
       const scriptPath = this.getScriptPath();
-      const tempOutputPath = path.join(os.tmpdir(), `talkingcut_${Date.now()}.json`);
+      // DEBUG: Save to project local folder for inspection
+      const tempOutputPath = path.join(process.cwd(), 'local', `debug_transcribe_output.json`);
 
       const args = [
         scriptPath,
@@ -125,6 +125,9 @@ export class PythonBridge {
         const text = data.toString();
         stdoutBuffer += text;
 
+        // Log Python output for debugging
+        console.log(`[Python] ${text.trim()}`);
+
         // Parse progress messages from stdout
         const lines = text.split('\n');
         for (const line of lines) {
@@ -147,7 +150,10 @@ export class PythonBridge {
       });
 
       this.currentProcess.stderr?.on('data', (data: Buffer) => {
-        stderrBuffer += data.toString();
+        const text = data.toString();
+        stderrBuffer += text;
+        // Log Python errors for debugging
+        console.error(`[Python stderr] ${text.trim()}`);
       });
 
       this.currentProcess.on('error', (error) => {

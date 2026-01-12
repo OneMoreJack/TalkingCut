@@ -190,20 +190,22 @@ const WordEditor: React.FC<WordEditorProps> = ({
             : '';
 
           return (
-            <span
-              key={word.id}
-              data-word-id={word.id}
-              onClick={() => onWordClick(word.start)}
-              className={`
-                cursor-text transition-colors duration-150 rounded-sm
-                ${activeStyle}
-                ${deletedStyle}
-                ${matchedStyle}
-                selection:bg-teal-900 selection:text-teal-100
-              `}
-            >
-              {word.text}
-            </span>
+            <React.Fragment key={word.id}>
+              <span
+                data-word-id={word.id}
+                onClick={() => onWordClick(word.start)}
+                className={`
+                  cursor-text transition-colors duration-150 rounded-sm
+                  ${activeStyle}
+                  ${deletedStyle}
+                  ${matchedStyle}
+                  selection:bg-teal-900 selection:text-teal-100
+                `}
+              >
+                {word.text}
+              </span>
+              {word.hasTrailingSpace && ' '}
+            </React.Fragment>
           );
         })}
       </p>
