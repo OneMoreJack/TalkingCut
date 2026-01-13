@@ -8,7 +8,16 @@ export const useProject = () => {
   const [status, setStatus] = useState<ProcessingStatus>({ step: 'idle', progress: 0, message: '' });
   const [history, setHistory] = useState<WordSegment[][]>([]);
   const [redoStack, setRedoStack] = useState<WordSegment[][]>([]);
-  const [modelSize, setModelSize] = useState<ModelSize>('base');
+
+  // Persist modelSize
+  const [modelSize, setModelSizeState] = useState<ModelSize>(() => {
+    return (localStorage.getItem('talkingcut_model_size') as ModelSize) || 'base';
+  });
+
+  const setModelSize = useCallback((size: ModelSize) => {
+    setModelSizeState(size);
+    localStorage.setItem('talkingcut_model_size', size);
+  }, []);
 
   // 1. Electron IPC Listeners
   useEffect(() => {

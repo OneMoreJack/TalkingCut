@@ -48,10 +48,32 @@ const App: React.FC = () => {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [originalVideoSrc, setOriginalVideoSrc] = useState<string | null>(null);
   const [isPreviewProcessing, setIsPreviewProcessing] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [showTimeline, setShowTimeline] = useState(true);
-  const [timelineZoom, setTimelineZoom] = useState(1);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('talkingcut_sidebar_open');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [showTimeline, setShowTimeline] = useState(() => {
+    const saved = localStorage.getItem('talkingcut_show_timeline');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [timelineZoom, setTimelineZoom] = useState(() => {
+    const saved = localStorage.getItem('talkingcut_timeline_zoom');
+    return saved !== null ? parseFloat(saved) : 1;
+  });
   const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
+
+  // Persist UI settings
+  useEffect(() => {
+    localStorage.setItem('talkingcut_sidebar_open', String(isSidebarOpen));
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    localStorage.setItem('talkingcut_show_timeline', String(showTimeline));
+  }, [showTimeline]);
+
+  useEffect(() => {
+    localStorage.setItem('talkingcut_timeline_zoom', String(timelineZoom));
+  }, [timelineZoom]);
 
   const togglePlay = () => {
     if (videoRef.current) {
