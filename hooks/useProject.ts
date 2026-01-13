@@ -181,6 +181,30 @@ export const useProject = () => {
     setProject(prev => prev ? { ...prev, duration } : null);
   }, [project]);
 
+  const setRangeDelete = useCallback((start: number, end: number, deleted: boolean) => {
+    if (!project) return;
+
+    // Save to history before change
+    setHistory(prev => [...prev, project.segments]);
+    setRedoStack([]);
+
+    const newSegments = project.segments.map(s => {
+      // If the segment is within the range, update its status
+      // We use a strictly-within or mostly-within check
+      // For boundary adjustments, if a word's midpoint is within the range, we toggle it
+      const mid = (s.start + s.end) / 2;
+      if (mid >= start && mid <= end) {
+        return { ...s, deleted };
+      }
+      return s;
+    });
+
+    setProject({
+      ...project,
+      segments: newSegments
+    });
+  }, [project]);
+
   return {
     project,
     status,
@@ -188,6 +212,7 @@ export const useProject = () => {
     saveProject,
     toggleWordDelete,
     toggleWordsDelete,
+    setRangeDelete,
     deleteFillers,
     undo,
     redo,

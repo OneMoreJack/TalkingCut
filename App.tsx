@@ -27,6 +27,7 @@ const App: React.FC = () => {
     saveProject,
     toggleWordDelete,
     toggleWordsDelete,
+    setRangeDelete,
     deleteFillers,
     undo,
     redo,
@@ -60,6 +61,20 @@ const App: React.FC = () => {
     return saved !== null ? parseFloat(saved) : 1;
   });
   const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
+
+  // Playhead Smoothing: Use requestAnimationFrame to poll video time for smoother UI
+  useEffect(() => {
+    let rafId: number;
+    const updateTime = () => {
+      if (videoRef.current && !videoRef.current.paused && !skipFlag.current) {
+        setCurrentTime(videoRef.current.currentTime);
+      }
+      rafId = requestAnimationFrame(updateTime);
+    };
+
+    rafId = requestAnimationFrame(updateTime);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
 
   // Persist UI settings
   useEffect(() => {
@@ -367,7 +382,7 @@ const App: React.FC = () => {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto scrollbar-hide">
               {project ? (
                 <WordEditor 
                   segments={project.segments} 
@@ -404,6 +419,8 @@ const App: React.FC = () => {
                       const time = v.currentTime;
                       
                       if (!skipFlag.current) {
+                        // Note: currentTime is also updated by the rAF loop for smoothness
+                        // but we keep this as a fallback and to trigger immediate updates on pause/seek
                         setCurrentTime(time);
                       }
 
@@ -530,6 +547,7 @@ const App: React.FC = () => {
                   audioPath={project.audioPath}
                   selectionRange={selectionRange}
                   onSelectionChange={handleSelectionChange}
+                  onUpdateDeletionRange={setRangeDelete}
                 />
               )
             ) : (

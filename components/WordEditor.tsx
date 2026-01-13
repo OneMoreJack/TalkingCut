@@ -65,6 +65,7 @@ const WordEditor: React.FC<WordEditorProps> = ({
         if (!window.getSelection()?.toString()) {
            setSelectedIds([]);
            setSelectionRect(null);
+           onSelectionChange(null);
         }
       }, 100);
       return;
@@ -121,6 +122,7 @@ const WordEditor: React.FC<WordEditorProps> = ({
     window.getSelection()?.removeAllRanges();
     setSelectedIds([]);
     setSelectionRect(null);
+    onSelectionChange(null);
   };
 
   const handleAiCorrection = (e: React.MouseEvent) => {
@@ -229,7 +231,8 @@ const WordEditor: React.FC<WordEditorProps> = ({
                 const isActive = currentTime >= word.start && currentTime < word.end;
                 const isMatched = searchTerm && word.text.toLowerCase().includes(searchTerm.toLowerCase());
                 
-                const isInSelection = selectionRange && word.start >= selectionRange.start && word.end <= selectionRange.end;
+                // Words only show selection highlight if NOT deleted
+                const isInSelection = selectionRange && word.start >= selectionRange.start && word.end <= selectionRange.end && !word.deleted;
 
                 const activeStyle = isActive 
                   ? 'bg-indigo-500/30 text-indigo-200 font-medium' 
@@ -240,10 +243,10 @@ const WordEditor: React.FC<WordEditorProps> = ({
                   : '';
 
                 const deletedStyle = word.deleted 
-                    ? 'line-through decoration-zinc-600 text-zinc-600 decoration-2' 
+                    ? 'line-through decoration-zinc-500/50 text-zinc-500/50 decoration-1' 
                     : 'hover:text-zinc-100';
 
-                const matchedStyle = !isActive && !isInSelection && isMatched 
+                const matchedStyle = !isActive && !isInSelection && !word.deleted && isMatched 
                   ? 'bg-yellow-500/20 text-yellow-200' 
                   : '';
 
