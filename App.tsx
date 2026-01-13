@@ -4,6 +4,7 @@ import {
   FileVideo,
   PanelLeftClose,
   PanelLeftOpen,
+  Pause,
   Play,
   Redo2,
   Search,
@@ -61,6 +62,8 @@ const App: React.FC = () => {
     return saved !== null ? parseFloat(saved) : 1;
   });
   const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isDraggingTimeline, setIsDraggingTimeline] = useState(false);
 
   // Playhead Smoothing: Use requestAnimationFrame to poll video time for smoother UI
   useEffect(() => {
@@ -88,6 +91,44 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('talkingcut_timeline_zoom', String(timelineZoom));
   }, [timelineZoom]);
+
+  // Sync isPlaying state with video events
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onEnded = () => setIsPlaying(false);
+
+    v.addEventListener('play', onPlay);
+    v.addEventListener('pause', onPause);
+    v.addEventListener('ended', onEnded);
+
+    return () => {
+      v.removeEventListener('play', onPlay);
+      v.removeEventListener('pause', onPause);
+      v.removeEventListener('ended', onEnded);
+    };
+  }, []);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input or textarea
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -188,7 +229,6 @@ const App: React.FC = () => {
   const handleJumpToTime = (time: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime = time;
-      videoRef.current.play().catch(e => console.warn('Play blocked:', e));
     }
     setCurrentTime(time);
   };
@@ -425,7 +465,8 @@ const App: React.FC = () => {
                       }
 
                       // Live Preview Skipping Logic
-                      if (isPreviewMode && !skipFlag.current) {
+                      // Suspend skipping when dragging timeline to avoid jumping
+                      if (isPreviewMode && !skipFlag.current && !isDraggingTimeline) {
                         const inCut = activeCuts.some(cut => time >= cut.start && time < cut.end);
                         if (!inCut) {
                           const nextCut = activeCuts.find(cut => cut.start > time);
@@ -502,9 +543,9 @@ const App: React.FC = () => {
             <div className="flex items-center justify-center space-x-4 w-1/3">
               <button 
                 onClick={togglePlay}
-                className="p-2.5 bg-indigo-600 text-white rounded-full hover:scale-105 transition-transform"
+                className="p-2.5 bg-indigo-600 text-white rounded-full hover:scale-105 transition-transform flex items-center justify-center"
               >
-                <Play size={18} fill="currentColor" />
+                {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
               </button>
               <div className="flex items-center">
                 <span className="text-sm font-mono tabular-nums text-white">
@@ -549,6 +590,7 @@ const App: React.FC = () => {
                   onSelectionChange={handleSelectionChange}
                   cutRanges={project.cutRanges}
                   onUpdateCutRanges={updateCutRanges}
+                  onStatusChange={(status) => setIsDraggingTimeline(status.isDragging)}
                 />
               )
             ) : (

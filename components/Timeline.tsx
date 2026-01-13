@@ -13,6 +13,7 @@ interface TimelineProps {
   onSelectionChange: (range: { start: number; end: number } | null) => void;
   cutRanges: { id: string; start: number; end: number }[];
   onUpdateCutRanges: (ranges: { id: string; start: number; end: number }[]) => void;
+  onStatusChange?: (status: { isDragging: boolean }) => void;
 }
 
 const Timeline: React.FC<TimelineProps> = ({ 
@@ -25,7 +26,8 @@ const Timeline: React.FC<TimelineProps> = ({
   selectionRange,
   onSelectionChange,
   cutRanges,
-  onUpdateCutRanges
+  onUpdateCutRanges,
+  onStatusChange
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,6 +39,9 @@ const Timeline: React.FC<TimelineProps> = ({
     blockId?: string;
     originalRange?: { start: number; end: number };
   } | null>(null);
+
+  // Ref to track if we were just dragging to prevent handleClick from firing
+  const wasDraggingRef = useRef(false);
 
   // Resize canvas for waveform (same)
   useEffect(() => {
@@ -67,13 +72,14 @@ const Timeline: React.FC<TimelineProps> = ({
     const canvasWidth = canvas.clientWidth;
     const canvasHeight = canvas.clientHeight;
     const ratio = data.length / canvasWidth;
-    const amp = canvasHeight * 0.7;
+    const amp = canvasHeight * 0.6; // Slightly reduced max amplitude
 
     for (let i = 0; i < canvasWidth; i++) {
         const dataIdx = Math.floor(i * ratio);
         const rawPeak = data[dataIdx] || 0;
-        const peak = Math.sqrt(rawPeak); 
-        const h = Math.max(1.5, peak * amp);
+        // Linear curve is cleaner for silence than Math.sqrt
+        const peak = rawPeak; 
+        const h = Math.max(0.5, peak * amp); // Lowered minimum height for silence
         ctx.fillRect(i, (canvasHeight - h) / 2, 0.9, h);
     }
   }, [peaks, zoom, duration]);
@@ -91,6 +97,11 @@ const Timeline: React.FC<TimelineProps> = ({
   }, [currentTime, zoom, duration, dragging]);
 
   const handleClick = (e: React.MouseEvent) => {
+    // If we just finished a drag, don't trigger a click/seek
+    if (wasDraggingRef.current) {
+        wasDraggingRef.current = false;
+        return;
+    }
     if (dragging) return;
     if (!containerRef.current || duration === 0) return;
     const rect = containerRef.current.getBoundingClientRect();
@@ -109,6 +120,8 @@ const Timeline: React.FC<TimelineProps> = ({
   const handleDragStart = (e: React.MouseEvent, type: any, blockId?: string) => {
     e.stopPropagation();
     setDragging({ type, blockId });
+    wasDraggingRef.current = true; // Mark that a drag has started
+    onStatusChange?.({ isDragging: true });
   };
 
   useEffect(() => {
@@ -125,7 +138,6 @@ const Timeline: React.FC<TimelineProps> = ({
       } else if (dragging.type === 'selection-right' && selectionRange) {
         onSelectionChange({ start: selectionRange.start, end: Math.max(newTime, selectionRange.start + 0.05) });
       } else if (dragging.type.startsWith('deleted') && dragging.blockId) {
-        // Source of truth: manipuate cutRanges directly for "Free Dragging"
         const rangeIndex = cutRanges.findIndex(r => r.id === dragging.blockId);
         if (rangeIndex === -1) return;
 
@@ -143,7 +155,10 @@ const Timeline: React.FC<TimelineProps> = ({
       }
     };
 
-    const handleMouseUp = () => setDragging(null);
+    const handleMouseUp = () => {
+      setDragging(null);
+      onStatusChange?.({ isDragging: false });
+    };
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     return () => {
@@ -172,31 +187,49 @@ const Timeline: React.FC<TimelineProps> = ({
           />
 
           {/* Precision Deleted Blocks (Source of Truth) */}
-          {cutRanges.map((block) => (
-            <div 
-              key={block.id}
-              className="absolute inset-y-0 bg-zinc-800/80 border-x border-zinc-700/50 z-10 group/del"
-              style={{ 
-                left: `${(block.start / duration) * 100}%`,
-                width: `${((block.end - block.start) / duration) * 100}%`
-              }}
-            >
-              {/* Left Handle */}
+          {cutRanges.map((block) => {
+            const isDraggingLeft = dragging?.type === 'deleted-left' && dragging.blockId === block.id;
+            const isDraggingRight = dragging?.type === 'deleted-right' && dragging.blockId === block.id;
+
+            return (
               <div 
-                onMouseDown={(e) => handleDragStart(e, 'deleted-left', block.id)}
-                className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize hover:bg-zinc-600/50 flex items-center justify-center -translate-x-1"
+                key={block.id}
+                className="absolute inset-y-0 bg-zinc-200/[0.3] z-10 group/del"
+                style={{ 
+                  left: `${(block.start / duration) * 100}%`,
+                  width: `${((block.end - block.start) / duration) * 100}%`
+                }}
               >
-                <div className="w-1 h-6 bg-zinc-600 rounded-full opacity-60" />
+                {/* Left Handle */}
+                <div 
+                  onMouseDown={(e) => handleDragStart(e, 'deleted-left', block.id)}
+                  className="absolute inset-y-0 left-0 w-3 cursor-ew-resize flex items-center justify-center -translate-x-1.5 group/left"
+                >
+                  {isDraggingLeft ? (
+                    /* Thin line when dragging - Centered in the w-3 hit area */
+                    <div className="w-px h-full bg-white/90" />
+                  ) : (
+                    /* Pill shape when idle - Centered automatically by justify-center */
+                    <div className="w-1.5 h-6 bg-zinc-600/80 rounded-full group-hover/left:bg-zinc-100 group-hover/left:scale-y-110 transition-all shadow-sm" />
+                  )}
+                </div>
+                
+                {/* Right Handle */}
+                <div 
+                  onMouseDown={(e) => handleDragStart(e, 'deleted-right', block.id)}
+                  className="absolute inset-y-0 right-0 w-3 cursor-ew-resize flex items-center justify-center translate-x-1.5 group/right"
+                >
+                  {isDraggingRight ? (
+                    /* Thin line when dragging - Centered in the w-3 hit area */
+                    <div className="w-px h-full bg-white/90" />
+                  ) : (
+                    /* Pill shape when idle - Centered automatically by justify-center */
+                    <div className="w-1.5 h-6 bg-zinc-600/80 rounded-full group-hover/right:bg-zinc-100 group-hover/right:scale-y-110 transition-all shadow-sm" />
+                  )}
+                </div>
               </div>
-              {/* Right Handle */}
-              <div 
-                onMouseDown={(e) => handleDragStart(e, 'deleted-right', block.id)}
-                className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize hover:bg-zinc-600/50 flex items-center justify-center translate-x-1"
-              >
-                <div className="w-1 h-6 bg-zinc-600 rounded-full opacity-60" />
-              </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* Selection Overlay */}
           {selectionRange && (
