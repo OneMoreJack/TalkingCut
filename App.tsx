@@ -27,7 +27,7 @@ const App: React.FC = () => {
     saveProject,
     toggleWordDelete,
     toggleWordsDelete,
-    setRangeDelete,
+    updateCutRanges,
     deleteFillers,
     undo,
     redo,
@@ -117,7 +117,7 @@ const App: React.FC = () => {
   const activeCuts = useMemo(() => {
     if (!project) return [];
     return generateCutList(project);
-  }, [project?.segments, project?.settings.paddingStart, project?.settings.paddingEnd]);
+  }, [project?.cutRanges, project?.settings.paddingStart, project?.settings.paddingEnd]);
 
   const handleApply = async () => {
     if (!project) return;
@@ -547,7 +547,8 @@ const App: React.FC = () => {
                   audioPath={project.audioPath}
                   selectionRange={selectionRange}
                   onSelectionChange={handleSelectionChange}
-                  onUpdateDeletionRange={setRangeDelete}
+                  cutRanges={project.cutRanges}
+                  onUpdateCutRanges={updateCutRanges}
                 />
               )
             ) : (

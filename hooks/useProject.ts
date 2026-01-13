@@ -6,8 +6,8 @@ export type ModelSize = 'tiny' | 'base' | 'small' | 'medium' | 'large-v3-turbo';
 export const useProject = () => {
   const [project, setProject] = useState<VideoProject | null>(null);
   const [status, setStatus] = useState<ProcessingStatus>({ step: 'idle', progress: 0, message: '' });
-  const [history, setHistory] = useState<WordSegment[][]>([]);
-  const [redoStack, setRedoStack] = useState<WordSegment[][]>([]);
+  const [history, setHistory] = useState<{ segments: WordSegment[], cutRanges: any[] }[]>([]);
+  const [redoStack, setRedoStack] = useState<{ segments: WordSegment[], cutRanges: any[] }[]>([]);
 
   // Persist modelSize
   const [modelSize, setModelSizeState] = useState<ModelSize>(() => {
@@ -77,6 +77,7 @@ export const useProject = () => {
           audioPath: result.audioPath,
           duration: result.segments.length > 0 ? result.segments[result.segments.length - 1].end : 0,
           segments: result.segments as any,
+          cutRanges: [],
           settings: { paddingStart: 0.1, paddingEnd: 0.1, minSilenceDuration: 0.5, crossfadeDuration: 0.02, silenceThreshold: 1.0 }
         });
         setStatus({ step: 'idle', progress: 100, message: 'Done' });
@@ -107,102 +108,120 @@ export const useProject = () => {
     return result;
   }, [project]);
 
-  const toggleWordDelete = useCallback((id: string) => {
+  const saveHistory = useCallback(() => {
+    if (!project) return;
+    setHistory(prev => [...prev.slice(-49), { segments: project.segments, cutRanges: project.cutRanges }]);
+    setRedoStack([]);
+  }, [project]);
+
+  const updateCutRanges = useCallback((newRanges: { id: string, start: number, end: number }[]) => {
     if (!project) return;
 
-    // Save to history before change
-    setHistory(prev => [...prev, project.segments]);
-    setRedoStack([]);
+    // Sync words deleted state based on ranges
+    const syncedSegments = project.segments.map(s => {
+      const mid = (s.start + s.end) / 2;
+      const isDeleted = newRanges.some(r => mid >= r.start && mid <= r.end);
+      return { ...s, deleted: isDeleted };
+    });
 
     setProject({
       ...project,
-      segments: project.segments.map(s => s.id === id ? { ...s, deleted: !s.deleted } : s)
+      segments: syncedSegments,
+      cutRanges: newRanges
     });
   }, [project]);
+
+  const toggleWordDelete = useCallback((id: string) => {
+    if (!project) return;
+    saveHistory();
+
+    const word = project.segments.find(s => s.id === id);
+    if (!word) return;
+
+    let newCutRanges = [...project.cutRanges];
+    if (word.deleted) {
+      // Remove ranges that cover this word
+      newCutRanges = newCutRanges.filter(r => !((word.start + word.end) / 2 >= r.start && (word.start + word.end) / 2 <= r.end));
+    } else {
+      // Add a new cut range for this word
+      newCutRanges.push({ id: Math.random().toString(36).substr(2, 9), start: word.start, end: word.end });
+    }
+
+    updateCutRanges(newCutRanges);
+  }, [project, saveHistory, updateCutRanges]);
 
   const toggleWordsDelete = useCallback((ids: string[]) => {
     if (!project) return;
+    saveHistory();
 
-    // Save to history before change
-    setHistory(prev => [...prev, project.segments]);
-    setRedoStack([]);
+    const selectedWords = project.segments.filter(s => ids.includes(s.id));
+    if (selectedWords.length === 0) return;
 
-    setProject({
-      ...project,
-      segments: project.segments.map(s => ids.includes(s.id) ? { ...s, deleted: !s.deleted } : s)
-    });
-  }, [project]);
+    const allAlreadyDeleted = selectedWords.every(w => w.deleted);
+    let newCutRanges = [...project.cutRanges];
+
+    if (allAlreadyDeleted) {
+      // Restore: remove ranges that overlap with these words
+      newCutRanges = newCutRanges.filter(r =>
+        !selectedWords.some(w => (w.start + w.end) / 2 >= r.start && (w.start + w.end) / 2 <= r.end)
+      );
+    } else {
+      // Delete: add a single range covering all selected words
+      const start = Math.min(...selectedWords.map(w => w.start));
+      const end = Math.max(...selectedWords.map(w => w.end));
+      newCutRanges.push({ id: Math.random().toString(36).substr(2, 9), start, end });
+    }
+
+    updateCutRanges(newCutRanges);
+  }, [project, saveHistory, updateCutRanges]);
 
   const deleteFillers = useCallback(() => {
     if (!project) return;
+    saveHistory();
 
-    // Save to history before change
-    setHistory(prev => [...prev, project.segments]);
-    setRedoStack([]);
-
-    setProject({
-      ...project,
-      segments: project.segments.map(s =>
-        s.type === WordType.FILLER || (s.type === WordType.SILENCE && (s.end - s.start) >= (project.settings.silenceThreshold ?? 1.0))
-          ? { ...s, deleted: true }
-          : s
-      )
+    const newRanges = [...project.cutRanges];
+    project.segments.forEach(s => {
+      if (s.type === WordType.FILLER || (s.type === WordType.SILENCE && (s.end - s.start) >= (project.settings.silenceThreshold ?? 1.0))) {
+        if (!newRanges.some(r => s.start >= r.start && s.end <= r.end)) {
+          newRanges.push({ id: Math.random().toString(36).substr(2, 9), start: s.start, end: s.end });
+        }
+      }
     });
-  }, [project]);
+
+    updateCutRanges(newRanges);
+  }, [project, saveHistory, updateCutRanges]);
 
   const undo = useCallback(() => {
     if (history.length === 0 || !project) return;
 
-    const prevSegments = history[history.length - 1];
-    setRedoStack(prev => [...prev, project.segments]);
+    const prevState = history[history.length - 1];
+    setRedoStack(prev => [...prev, { segments: project.segments, cutRanges: project.cutRanges }]);
     setHistory(prev => prev.slice(0, -1));
 
     setProject({
       ...project,
-      segments: prevSegments
+      segments: prevState.segments,
+      cutRanges: prevState.cutRanges
     });
   }, [history, project]);
 
   const redo = useCallback(() => {
     if (redoStack.length === 0 || !project) return;
 
-    const nextSegments = redoStack[redoStack.length - 1];
-    setHistory(prev => [...prev, project.segments]);
+    const nextState = redoStack[redoStack.length - 1];
+    setHistory(prev => [...prev, { segments: project.segments, cutRanges: project.cutRanges }]);
     setRedoStack(prev => prev.slice(0, -1));
 
     setProject({
       ...project,
-      segments: nextSegments
+      segments: nextState.segments,
+      cutRanges: nextState.cutRanges
     });
   }, [redoStack, project]);
 
   const updateDuration = useCallback((duration: number) => {
     if (!project) return;
     setProject(prev => prev ? { ...prev, duration } : null);
-  }, [project]);
-
-  const setRangeDelete = useCallback((start: number, end: number, deleted: boolean) => {
-    if (!project) return;
-
-    // Save to history before change
-    setHistory(prev => [...prev, project.segments]);
-    setRedoStack([]);
-
-    const newSegments = project.segments.map(s => {
-      // If the segment is within the range, update its status
-      // We use a strictly-within or mostly-within check
-      // For boundary adjustments, if a word's midpoint is within the range, we toggle it
-      const mid = (s.start + s.end) / 2;
-      if (mid >= start && mid <= end) {
-        return { ...s, deleted };
-      }
-      return s;
-    });
-
-    setProject({
-      ...project,
-      segments: newSegments
-    });
   }, [project]);
 
   return {
@@ -212,7 +231,8 @@ export const useProject = () => {
     saveProject,
     toggleWordDelete,
     toggleWordsDelete,
-    setRangeDelete,
+    updateCutRanges,
+    saveHistory,
     deleteFillers,
     undo,
     redo,

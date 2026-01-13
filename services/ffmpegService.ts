@@ -6,36 +6,31 @@ import { VideoProject } from '../types';
  * Implements "Breathing Room" (Padding) logic.
  */
 export const generateCutList = (project: VideoProject) => {
-  const { segments, settings, duration } = project;
+  const { cutRanges, settings, duration } = project;
   const { paddingStart, paddingEnd } = settings;
 
-  const cutPoints: { start: number; end: number }[] = [];
-  let currentSegment: { start: number; end: number } | null = null;
+  // 1. Sort cut ranges by start time to handle them sequentially
+  const sortedCuts = [...cutRanges].sort((a, b) => a.start - b.start);
 
-  segments.forEach((word, index) => {
-    if (!word.deleted) {
-      if (!currentSegment) {
-        // Start a new sequence
-        currentSegment = { start: word.start, end: word.end };
-      } else {
-        // Extend current sequence
-        currentSegment.end = word.end;
-      }
-    } else {
-      // Current sequence ends because we hit a deleted word
-      if (currentSegment) {
-        cutPoints.push(applyPadding(currentSegment, paddingStart, paddingEnd, duration));
-        currentSegment = null;
-      }
-    }
+  // 2. Derive kept segments (the gaps between cut ranges)
+  const keptSegments: { start: number; end: number }[] = [];
+  let lastEnd = 0;
 
-    // Last segment case
-    if (index === segments.length - 1 && currentSegment) {
-      cutPoints.push(applyPadding(currentSegment, paddingStart, paddingEnd, duration));
+  sortedCuts.forEach(cut => {
+    // If there's a gap between the last cut and this one, it's a kept segment
+    if (cut.start > lastEnd) {
+      keptSegments.push({ start: lastEnd, end: cut.start });
     }
+    lastEnd = Math.max(lastEnd, cut.end);
   });
 
-  return cutPoints;
+  // Handle the tail segment
+  if (lastEnd < duration) {
+    keptSegments.push({ start: lastEnd, end: duration });
+  }
+
+  // 3. Apply "Breathing Room" (Padding) to each kept segment
+  return keptSegments.map(seg => applyPadding(seg, paddingStart, paddingEnd, duration));
 };
 
 const applyPadding = (

@@ -28,6 +28,7 @@ export interface VideoProject {
   audioPath?: string;
   duration: number;
   segments: WordSegment[];
+  cutRanges: { id: string; start: number; end: number }[];
   settings: {
     paddingStart: number;
     paddingEnd: number;

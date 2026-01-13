@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useWaveform } from '../hooks/useWaveform';
 import { WordSegment } from '../types/index';
 
@@ -11,7 +11,8 @@ interface TimelineProps {
   audioPath?: string;
   selectionRange: { start: number; end: number } | null;
   onSelectionChange: (range: { start: number; end: number } | null) => void;
-  onUpdateDeletionRange: (start: number, end: number, deleted: boolean) => void;
+  cutRanges: { id: string; start: number; end: number }[];
+  onUpdateCutRanges: (ranges: { id: string; start: number; end: number }[]) => void;
 }
 
 const Timeline: React.FC<TimelineProps> = ({ 
@@ -23,7 +24,8 @@ const Timeline: React.FC<TimelineProps> = ({
   audioPath,
   selectionRange,
   onSelectionChange,
-  onUpdateDeletionRange
+  cutRanges,
+  onUpdateCutRanges
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -36,30 +38,7 @@ const Timeline: React.FC<TimelineProps> = ({
     originalRange?: { start: number; end: number };
   } | null>(null);
 
-  // Group consecutive deleted segments into unified blocks
-  const deletedBlocks = useMemo(() => {
-    const blocks: { id: string; start: number; end: number }[] = [];
-    let currentBlock: { id: string, start: number, end: number } | null = null;
-    
-    segments.forEach((s) => {
-      if (s.deleted) {
-        if (!currentBlock) {
-          currentBlock = { id: s.id, start: s.start, end: s.end };
-        } else {
-          currentBlock.end = s.end;
-        }
-      } else {
-        if (currentBlock) {
-          blocks.push(currentBlock);
-          currentBlock = null;
-        }
-      }
-    });
-    if (currentBlock) blocks.push(currentBlock);
-    return blocks;
-  }, [segments]);
-
-  // Resize canvas for waveform
+  // Resize canvas for waveform (same)
   useEffect(() => {
     if (!canvasRef.current || !peaks || !duration) return;
     const canvas = canvasRef.current;
@@ -99,7 +78,7 @@ const Timeline: React.FC<TimelineProps> = ({
     }
   }, [peaks, zoom, duration]);
 
-  // Auto-scroll
+  // Auto-scroll (same)
   useEffect(() => {
     if (!containerRef.current || dragging || duration === 0) return;
     const container = containerRef.current;
@@ -127,9 +106,9 @@ const Timeline: React.FC<TimelineProps> = ({
     return (x / totalWidth) * duration;
   };
 
-  const handleDragStart = (e: React.MouseEvent, type: any, blockId?: string, range?: any) => {
+  const handleDragStart = (e: React.MouseEvent, type: any, blockId?: string) => {
     e.stopPropagation();
-    setDragging({ type, blockId, originalRange: range });
+    setDragging({ type, blockId });
   };
 
   useEffect(() => {
@@ -145,26 +124,22 @@ const Timeline: React.FC<TimelineProps> = ({
         onSelectionChange({ start: Math.min(newTime, selectionRange.end - 0.05), end: selectionRange.end });
       } else if (dragging.type === 'selection-right' && selectionRange) {
         onSelectionChange({ start: selectionRange.start, end: Math.max(newTime, selectionRange.start + 0.05) });
-      } else if (dragging.type === 'deleted-left' && dragging.originalRange) {
-        // When shrinking/expanding a deletion from the left
-        const { start, end } = dragging.originalRange;
-        if (newTime < start) {
-          // Expanding left: set words between newTime and start as deleted
-          onUpdateDeletionRange(newTime, start, true);
-        } else if (newTime > start) {
-          // Shrinking left: set words between start and newTime as active
-          onUpdateDeletionRange(start, newTime, false);
+      } else if (dragging.type.startsWith('deleted') && dragging.blockId) {
+        // Source of truth: manipuate cutRanges directly for "Free Dragging"
+        const rangeIndex = cutRanges.findIndex(r => r.id === dragging.blockId);
+        if (rangeIndex === -1) return;
+
+        const newCutRanges = [...cutRanges];
+        const range = { ...newCutRanges[rangeIndex] };
+
+        if (dragging.type === 'deleted-left') {
+          range.start = Math.min(newTime, range.end - 0.01);
+        } else {
+          range.end = Math.max(newTime, range.start + 0.01);
         }
-      } else if (dragging.type === 'deleted-right' && dragging.originalRange) {
-        // When shrinking/expanding a deletion from the right
-        const { start, end } = dragging.originalRange;
-        if (newTime > end) {
-          // Expanding right: set words between end and newTime as deleted
-          onUpdateDeletionRange(end, newTime, true);
-        } else if (newTime < end) {
-          // Shrinking right: set words between newTime and end as active
-          onUpdateDeletionRange(newTime, end, false);
-        }
+
+        newCutRanges[rangeIndex] = range;
+        onUpdateCutRanges(newCutRanges);
       }
     };
 
@@ -175,7 +150,7 @@ const Timeline: React.FC<TimelineProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, selectionRange, duration, zoom]);
+  }, [dragging, selectionRange, duration, zoom, cutRanges, onUpdateCutRanges]);
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -196,8 +171,8 @@ const Timeline: React.FC<TimelineProps> = ({
             className="absolute inset-0 w-full h-full pointer-events-none opacity-40"
           />
 
-          {/* Interactive Deleted Blocks */}
-          {deletedBlocks.map((block) => (
+          {/* Precision Deleted Blocks (Source of Truth) */}
+          {cutRanges.map((block) => (
             <div 
               key={block.id}
               className="absolute inset-y-0 bg-zinc-800/80 border-x border-zinc-700/50 z-10 group/del"
@@ -208,14 +183,14 @@ const Timeline: React.FC<TimelineProps> = ({
             >
               {/* Left Handle */}
               <div 
-                onMouseDown={(e) => handleDragStart(e, 'deleted-left', block.id, block)}
+                onMouseDown={(e) => handleDragStart(e, 'deleted-left', block.id)}
                 className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize hover:bg-zinc-600/50 flex items-center justify-center -translate-x-1"
               >
                 <div className="w-1 h-6 bg-zinc-600 rounded-full opacity-60" />
               </div>
               {/* Right Handle */}
               <div 
-                onMouseDown={(e) => handleDragStart(e, 'deleted-right', block.id, block)}
+                onMouseDown={(e) => handleDragStart(e, 'deleted-right', block.id)}
                 className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize hover:bg-zinc-600/50 flex items-center justify-center translate-x-1"
               >
                 <div className="w-1 h-6 bg-zinc-600 rounded-full opacity-60" />
@@ -231,13 +206,10 @@ const Timeline: React.FC<TimelineProps> = ({
                 left: `${(selectionRange.start / duration) * 100}%`,
                 width: `${((selectionRange.end - selectionRange.start) / duration) * 100}%`
               }}
-            >
-                {/* Selection handles are usually passive but drawn for clarity */}
-                {/* We'll make them active if they don't overlap with deleted handles */}
-            </div>
+            />
           )}
           
-          {/* Active selection handles (on top of everything) */}
+          {/* Active selection handles */}
           {selectionRange && !dragging?.type.startsWith('deleted') && (
             <>
               <div 
@@ -273,4 +245,3 @@ const Timeline: React.FC<TimelineProps> = ({
 };
 
 export default Timeline;
-
