@@ -1,16 +1,15 @@
 import {
-    Check,
-    Download,
-    FileVideo,
-    PanelLeftClose,
-    PanelLeftOpen,
-    Play,
-    Redo2,
-    Scissors,
-    Search,
-    Trash2,
-    Undo2,
-    Zap
+  Check,
+  Download,
+  FileVideo,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Play,
+  Redo2,
+  Search,
+  Trash2,
+  Undo2,
+  Zap
 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ModelSelector from './components/ModelSelector';
@@ -190,15 +189,39 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
-      {/* Sidebar - Settings & File Info */}
-      <aside className={`border-r border-zinc-800 flex flex-col p-4 space-y-6 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'w-80' : 'w-0 p-0 overflow-hidden border-none'}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2 text-indigo-400 font-bold text-xl">
-            <Scissors size={24} />
-            <span>TalkingCut</span>
-          </div>
+    <div className="flex flex-col h-screen w-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
+      {/* Global Top Header (CapCut Style) */}
+      <header 
+        className="h-12 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900/80 backdrop-blur-md z-50 flex-shrink-0"
+        style={{ WebkitAppRegion: 'drag' } as any}
+      >
+        {/* Left: Traffic light area (reserved) */}
+        <div className="w-20" />
+
+        {/* Center: Project Name */}
+        <div className="flex items-center space-x-2 text-zinc-400 select-none">
+          <FileVideo size={16} className="text-indigo-400" />
+          <span className="text-sm font-medium tracking-tight">
+            {project ? project.name : 'TalkingCut - Video Editor'}
+          </span>
         </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center space-x-3" style={{ WebkitAppRegion: 'no-drag' } as any}>
+          <button 
+            disabled={!project}
+            onClick={handleExport}
+            className="flex items-center space-x-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-semibold transition-all disabled:opacity-50 shadow-md"
+          >
+            <Download size={14} />
+            <span>Export Final Cut</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar - Settings & File Info */}
+        <aside className={`border-r border-zinc-800 flex flex-col p-4 space-y-6 transition-all duration-300 ease-in-out ${isSidebarOpen ? 'w-80' : 'w-0 p-0 overflow-hidden border-none'}`}>
 
         <div className="space-y-4">
           {/* Model Selector with Download Status */}
@@ -297,7 +320,8 @@ const App: React.FC = () => {
         )}
       </aside>
 
-      <main className="flex-1 flex flex-col bg-zinc-950 overflow-hidden relative">
+        {/* Main Workspace */}
+        <main className="flex-1 flex flex-col bg-zinc-950 overflow-hidden relative">
 
 
         <div className="flex-1 flex flex-row overflow-hidden border-b border-zinc-800">
@@ -410,24 +434,15 @@ const App: React.FC = () => {
                   </div>
                 )}
                 
-                {isPreviewMode && (
-                  <button 
-                    onClick={exitPreview}
-                    className="absolute top-4 left-4 px-3 py-1 bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white rounded-full text-[10px] font-bold uppercase transition-all flex items-center space-x-1 border border-red-600/30"
-                  >
-                    <span>Exit Preview</span>
-                  </button>
-                )}
-
-                <button 
-                  disabled={!project}
-                  onClick={handleExport}
-                  className="absolute top-2 right-2 flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50 shadow-2xl z-20"
-                >
-                  <Download size={14} />
-                  <span>Export Final Cut</span>
-                </button>
-              </div>
+                  {isPreviewMode && (
+                    <button 
+                      onClick={exitPreview}
+                      className="absolute top-4 left-4 px-3 py-1 bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white rounded-full text-[10px] font-bold uppercase transition-all flex items-center space-x-1 border border-red-600/30"
+                    >
+                      <span>Exit Preview</span>
+                    </button>
+                  )}
+                </div>
             ) : (
                 <div className="flex flex-col items-center text-zinc-700">
                   <FileVideo size={64} className="mb-4 opacity-10" />
@@ -538,6 +553,7 @@ const App: React.FC = () => {
         </div>
       </main>
     </div>
+  </div>
   );
 };
 
