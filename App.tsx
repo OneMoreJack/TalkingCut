@@ -2,6 +2,7 @@ import {
   Check,
   Download,
   FileVideo,
+  FolderOpen,
   PanelLeftClose,
   PanelLeftOpen,
   Pause,
@@ -64,6 +65,14 @@ const App: React.FC = () => {
   const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isDraggingTimeline, setIsDraggingTimeline] = useState(false);
+  const [exportSuccessPath, setExportSuccessPath] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<string>('darwin');
+
+  useEffect(() => {
+    if (window.electronAPI) {
+      window.electronAPI.getPlatform().then(setPlatform);
+    }
+  }, []);
 
   // Playhead Smoothing: Use requestAnimationFrame to poll video time for smoother UI
   useEffect(() => {
@@ -147,11 +156,29 @@ const App: React.FC = () => {
     const ffmpegCommand = generateFFmpegCommand(project, outputPath);
     if (!ffmpegCommand) return;
 
-    await window.electronAPI.export.start({
+    const res = await window.electronAPI.export.start({
       videoPath: project.videoPath,
       outputPath,
       ffmpegCommand
     });
+
+    if (res.success) {
+      setExportSuccessPath(outputPath);
+      // Auto-hide after 10 seconds unless interacted with
+      setTimeout(() => setExportSuccessPath(prev => prev === outputPath ? null : prev), 10000);
+    }
+  };
+
+  const handleOpenExportFolder = () => {
+    if (exportSuccessPath && window.electronAPI) {
+      window.electronAPI.shell.showItemInFolder(exportSuccessPath);
+    }
+  };
+
+  const handlePlayExportedVideo = () => {
+    if (exportSuccessPath && window.electronAPI) {
+      window.electronAPI.shell.openPath(exportSuccessPath);
+    }
   };
 
   // Calculate the kept segments whenever project segments or settings change
@@ -614,7 +641,45 @@ const App: React.FC = () => {
         </div>
       </main>
     </div>
-  </div>
+      {/* Export Success Notification */}
+      {exportSuccessPath && (
+        <div className="fixed bottom-24 right-8 z-[100] animate-in slide-in-from-right-8 duration-300">
+          <div className="bg-zinc-800 border border-emerald-500/30 shadow-2xl shadow-emerald-500/10 rounded-xl p-4 min-w-[320px] backdrop-blur-xl">
+            <div className="flex items-start space-x-4">
+              <div className="bg-emerald-500/20 p-2 rounded-lg">
+                <Check size={20} className="text-emerald-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-white font-semibold text-sm mb-1">Export Successful</h4>
+                <p className="text-zinc-400 text-xs truncate mb-3">{exportSuccessPath.split(/[\\/]/).pop()}</p>
+                <div className="flex items-center space-x-2">
+                  <button 
+                    onClick={handlePlayExportedVideo}
+                    className="flex-1 flex items-center justify-center space-x-1.5 py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors"
+                  >
+                    <Play size={12} fill="currentColor" />
+                    <span>Play Video</span>
+                  </button>
+                  <button 
+                    onClick={handleOpenExportFolder}
+                    className="flex-1 flex items-center justify-center space-x-1.5 py-1.5 px-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 rounded-lg text-xs font-medium transition-colors"
+                  >
+                    <FolderOpen size={12} />
+                    <span>{platform === 'darwin' ? 'Show in Finder' : 'Show in Explorer'}</span>
+                  </button>
+                </div>
+              </div>
+              <button 
+                onClick={() => setExportSuccessPath(null)}
+                className="text-zinc-500 hover:text-zinc-300 transition-colors pt-0.5"
+              >
+                <Zap size={14} className="rotate-45" /> {/* Close icon workaround with Zap rotated */}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

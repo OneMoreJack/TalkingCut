@@ -148,7 +148,18 @@ const electronAPI = {
       ipcRenderer.on('model:downloadProgress', handler);
       return () => ipcRenderer.removeListener('model:downloadProgress', handler);
     }
-  }
+  },
+
+  // ----- Shell & System -----
+  shell: {
+    showItemInFolder: (path: string): Promise<void> =>
+      ipcRenderer.invoke('shell:showItemInFolder', path),
+    openPath: (path: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('shell:openPath', path)
+  },
+
+  getPlatform: (): Promise<string> =>
+    ipcRenderer.invoke('app:getPlatform')
 };
 
 // ============================================================================

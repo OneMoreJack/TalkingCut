@@ -8,7 +8,7 @@
  * - Native file system access
  */
 
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getModelById, MODEL_DEFINITIONS } from './models/modelDefinitions';
@@ -252,6 +252,21 @@ function setupIpcHandlers(): void {
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
+  });
+
+  // ----- Shell & System -----
+  ipcMain.handle('shell:showItemInFolder', (_event, fullPath: string) => {
+    shell.showItemInFolder(fullPath);
+    return { success: true };
+  });
+
+  ipcMain.handle('shell:openPath', async (_event, fullPath: string) => {
+    const error = await shell.openPath(fullPath);
+    return { success: error === '', error };
+  });
+
+  ipcMain.handle('app:getPlatform', () => {
+    return process.platform;
   });
 }
 
