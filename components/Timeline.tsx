@@ -42,36 +42,53 @@ const Timeline: React.FC<TimelineProps> = ({
     
     canvas.width = width;
     canvas.height = height;
-    ctx.scale(dpr, 1);
+    ctx.scale(dpr, dpr); // Scale both axes for consistent DPR handling
 
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     
     // Draw center line
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, canvas.clientHeight / 2);
     ctx.lineTo(canvas.clientWidth, canvas.clientHeight / 2);
     ctx.stroke();
 
-    ctx.fillStyle = '#bef264'; // Vibrant lime green like the reference
+    ctx.fillStyle = '#bef264'; // Vibrant lime green
 
     const data = peaks.data;
     const canvasWidth = canvas.clientWidth;
     const canvasHeight = canvas.clientHeight;
-    const step = Math.ceil(data.length / canvasWidth);
-    const amp = canvasHeight * 0.8; // Use 80% of height for peaks
+    // Map data points to pixels proportionally to avoid truncation when zoomed
+    const ratio = data.length / canvasWidth;
+    const amp = canvasHeight * 0.7; // Use 70% of height for peaks
 
     for (let i = 0; i < canvasWidth; i++) {
-        const rawPeak = data[i * step] || 0;
-        // Apply a slight boost to quiet parts (sqrt normalization)
+        const dataIdx = Math.floor(i * ratio);
+        const rawPeak = data[dataIdx] || 0;
+        // Normalization boost
         const peak = Math.sqrt(rawPeak); 
-        const h = Math.max(2, peak * amp);
+        const h = Math.max(1.5, peak * amp);
         
-        // Draw slightly thicker bars
-        ctx.fillRect(i, (canvasHeight - h) / 2, 0.8, h);
+        ctx.fillRect(i, (canvasHeight - h) / 2, 0.9, h);
     }
   }, [peaks, zoom, duration]);
+
+  // Auto-scroll to keep playhead centered
+  useEffect(() => {
+    if (!containerRef.current || isDraggingHandle || duration === 0) return;
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+    const totalWidth = rect.width * zoom;
+    const playheadX = (currentTime / duration) * totalWidth;
+    
+    // Center the playhead
+    const targetScroll = playheadX - rect.width / 2;
+    container.scrollTo({
+        left: targetScroll,
+        behavior: currentTime === 0 ? 'auto' : 'smooth'
+    });
+  }, [currentTime, zoom, duration, isDraggingHandle]);
 
   const handleClick = (e: React.MouseEvent) => {
     if (isDraggingHandle) return;
