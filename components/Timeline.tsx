@@ -14,6 +14,7 @@ interface TimelineProps {
   cutRanges: { id: string; start: number; end: number }[];
   onUpdateCutRanges: (ranges: { id: string; start: number; end: number }[]) => void;
   onStatusChange?: (status: { isDragging: boolean }) => void;
+  isPlaying?: boolean;
 }
 
 const Timeline: React.FC<TimelineProps> = ({ 
@@ -27,7 +28,8 @@ const Timeline: React.FC<TimelineProps> = ({
   onSelectionChange,
   cutRanges,
   onUpdateCutRanges,
-  onStatusChange
+  onStatusChange,
+  isPlaying = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -84,17 +86,28 @@ const Timeline: React.FC<TimelineProps> = ({
     }
   }, [peaks, zoom, duration]);
 
-  // Auto-scroll (same)
+  // Auto-scroll (Center the playhead during playback)
   useEffect(() => {
-    if (!containerRef.current || dragging || duration === 0) return;
+    if (!containerRef.current || dragging || duration === 0 || !isPlaying) return;
     const container = containerRef.current;
-    const rect = container.getBoundingClientRect();
-    const totalWidth = rect.width * zoom;
+    
+    // Use scrollWidth and clientWidth for precise centering
+    const totalWidth = container.scrollWidth;
+    const viewportWidth = container.clientWidth;
     const playheadX = (currentTime / duration) * totalWidth;
     
-    const targetScroll = playheadX - rect.width / 2;
-    container.scrollLeft = targetScroll;
-  }, [currentTime, zoom, duration, dragging]);
+    // Target position: playheadX minus half the viewport
+    const targetScroll = playheadX - viewportWidth / 2;
+    
+    // Browser will handle boundaries (0 and maxScroll) automatically,
+    // but we can be explicit to avoid jitter
+    const maxScroll = totalWidth - viewportWidth;
+    if (maxScroll > 0) {
+      container.scrollLeft = Math.max(0, Math.min(maxScroll, targetScroll));
+    } else {
+      container.scrollLeft = 0;
+    }
+  }, [currentTime, zoom, duration, dragging, isPlaying]);
 
   const handleClick = (e: React.MouseEvent) => {
     // If we just finished a drag, don't trigger a click/seek

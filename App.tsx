@@ -618,6 +618,7 @@ const App: React.FC = () => {
                   cutRanges={project.cutRanges}
                   onUpdateCutRanges={updateCutRanges}
                   onStatusChange={(status) => setIsDraggingTimeline(status.isDragging)}
+                  isPlaying={isPlaying}
                 />
               )
             ) : (
