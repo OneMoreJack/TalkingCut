@@ -1,0 +1,60 @@
+appId: com.onemoreJack.talkingcut
+productName: TalkingCut
+copyright: Copyright © 2026 Jack
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - python/**/*
+  - "!python/venv/**/*"
+  - "!python/__pycache__/**/*"
+  - "!**/*.map"
+  - "!**/*.ts"
+  - "!**/*.tsx"
+  - package.json
+
+extraResources:
+  - from: python
+    to: python
+    filter:
+      - "**/*"
+      - "!venv/**/*"
+      - "!__pycache__/**/*"
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+  icon: build/icon.png
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+
+dmg:
+  title: ${productName} ${version}
+  icon: build/icon.png
+  window:
+    width: 540
+    height: 380
+  contents:
+    - x: 144
+      y: 180
+      type: file
+    - x: 396
+      y: 180
+      type: link
+      path: /Applications
+
+win:
+  target:
+    - nsis
+  icon: build/icon.ico
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+linux:
+  target:
+    - AppImage
+  category: Utility
+  icon: build/icon.png

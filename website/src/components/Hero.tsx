@@ -51,7 +51,7 @@ export default function Hero() {
           className="flex flex-col sm:flex-row items-center justify-center gap-4"
         >
           <Link
-            href="https://github.com/OneMoreJack/TalkingCut/releases"
+            href="https://github.com/OneMoreJack/TalkingCut/releases/download/v0.0.1/TalkingCut-0.0.1-mac-arm64.dmg"
             className="flex items-center gap-2 px-8 py-4 rounded-full bg-white text-black font-semibold hover:opacity-90 transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.2)]"
           >
             <Download className="w-5 h-5" />
