@@ -15,7 +15,7 @@ English | [简体中文](./README_CN.md)
 
 ## 📺 Demo
 
-![TalkingCut Demo](./assets/docs/demo.mp4)
+<video src="./assets/docs/demo.mp4" controls width="100%" autoplay loop muted></video>
 
 ## ✨ Key Features
 

@@ -14,7 +14,7 @@
 
 ## 📺 演示视频
 
-![TalkingCut 演示](./assets/docs/demo.mp4)
+<video src="./assets/docs/demo.mp4" controls width="100%" autoplay loop muted></video>
 
 ## ✨ 核心功能
 
