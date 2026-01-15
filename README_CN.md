@@ -14,7 +14,7 @@
 
 ## 📺 演示视频
 
-![](https://github.com/OneMoreJack/TalkingCut/raw/main/assets/docs/demo.mp4)
+https://github.com/user-attachments/assets/3457f851-78e2-4141-a9f5-3d75a51c68e7
 
 ## ✨ 核心功能
 
