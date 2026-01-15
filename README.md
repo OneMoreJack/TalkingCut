@@ -13,6 +13,10 @@ English | [简体中文](./README_CN.md)
 ![Platform](https://img.shields.io/badge/platform-macOS%20(Silicon)%20|%20Windows-lightgrey.svg)
 ![Tech](https://img.shields.io/badge/tech-Electron%20|%20WhisperX%20|%20FFmpeg-orange.svg)
 
+## 📺 Demo
+
+![TalkingCut Demo](./assets/docs/demo.mp4)
+
 ## ✨ Key Features
 
 - ✂️ **Text-Driven Editing**: Delete a word, phrase, or sentence in the editor, and the video is instantly "cut" to match.

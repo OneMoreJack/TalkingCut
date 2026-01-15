@@ -12,6 +12,10 @@
 ![Platform](https://img.shields.io/badge/platform-macOS%20(Silicon)%20|%20Windows-lightgrey.svg)
 ![Tech](https://img.shields.io/badge/tech-Electron%20|%20WhisperX%20|%20FFmpeg-orange.svg)
 
+## 📺 演示视频
+
+![TalkingCut 演示](./assets/docs/demo.mp4)
+
 ## ✨ 核心功能
 
 - ✂️ **文本驱动编辑**：在编辑器中删除一个词、短语或句子，视频会立即"剪切"以匹配。
