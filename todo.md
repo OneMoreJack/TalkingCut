@@ -29,3 +29,4 @@
 ## 5. Deployment & Optimization
 - [ ] **Binary Packaging**: Bundle FFmpeg and a portable Python environment (using PyInstaller or conda-pack) within the Electron app.
 - [ ] **RAM Optimization**: Monitor memory usage and implement chunked processing for very long videos.
+- [ ] **Silence Detection Offset**: Fix the timing offset issue in video silence detection.

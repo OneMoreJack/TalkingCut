@@ -1,6 +1,13 @@
 # 🎙️ TalkingCut
 
-**TalkingCut** is a professional-grade, desktop-based video editing tool that revolutionizes the editing workflow through **Text-based Video Editing**. Instead of manually trimming waveforms, you edit your video by simply deleting text from a transcribed script—just like editing a Word document.
+English | [简体中文](./README_CN.md)
+
+**TalkingCut** is a text-driven editing tool designed specifically for spoken video content.
+
+**Fast**: Quickly remove unwanted footage through text editing.  
+**Precise**: Achieve millisecond-level refinement with waveform visualization.  
+**Efficient**: Dramatically optimize rough-cut workflows, letting creators focus on content.
+
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20(Silicon)%20|%20Windows-lightgrey.svg)
@@ -10,9 +17,8 @@
 
 - ✂️ **Text-Driven Editing**: Delete a word, phrase, or sentence in the editor, and the video is instantly "cut" to match.
 - 🤖 **Local AI Engine**: Powered by **WhisperX** for high-precision, word-level timestamp alignment. Everything runs locally on your machine—no cloud, no privacy concerns.
-- 🧹 **Smart Filler Word Detection**: Automatically identifies and highlights filler words ("uh", "um", "那个", "就是") and awkward silences for one-click removal.
-- 🌬️ **Breathing Room Control**: Customizable padding (e.g., 0.1s) for every cut to ensure natural transitions without abrupt audio clipping.
-- ⚡ **Lossless FFmpeg Rendering**: Utilizes FFmpeg's stream-copy and complex-filter capabilities for lightning-fast exports.
+- 📊 **Waveform Refinement**: Visualize audio waveforms for millisecond-level precision. The waveform syncs with the text editor in real-time—click on text to jump to the corresponding waveform position for fine-grained editing control.
+- ⚡ **Efficient FFmpeg Rendering**: Utilizes FFmpeg's stream-copy and complex-filter capabilities for fast exports.
 - 🍎 **Silicon Optimized**: Specifically architected to leverage Apple Silicon (MPS) for high-speed AI inference on MacBook hardware.
 
 ## 🏗️ Architecture
@@ -79,9 +85,9 @@ pnpm run electron:dev
 ### 📥 Model Management
 
 When the app opens:
-1. Select a model size (e.g., **Tiny** or **Base**) from the sidebar.
-2. Click the **"Not Cached"** badge or simply click **"Open Video File"**—the app will automatically download the required model weights to your local storage.
-3. Once the badge turns green (**Cached**), you're ready to transcribe!
+1. Select a model size from the sidebar. **Note**: Larger models provide higher recognition accuracy but require more VRAM/RAM and are slower to process. If your device has sufficient resources (e.g., 16GB+ RAM), choosing a larger model is recommended. **Medium** is generally the best balance between speed and accuracy for most users.
+2. Click the **Download** button or simply click **"Open Video File"**—the app will automatically download the required model weights to your local storage.
+3. Once the status turns green (**Cached**), you're ready to transcribe!
 
 ---
-*Created with ❤️ by the TalkingCut Team.*
+*Created with ❤️ by the Jack.*
