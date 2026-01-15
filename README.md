@@ -94,4 +94,4 @@ When the app opens:
 3. Once the status turns green (**Cached**), you're ready to transcribe!
 
 ---
-*Created with ❤️ by the Jack.*
+*Created with ❤️ by Jack.*
