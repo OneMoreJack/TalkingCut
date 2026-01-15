@@ -1,4 +1,4 @@
-import { RotateCcw, Trash2, Wand2 } from 'lucide-react';
+import { RotateCcw, Trash2 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { WordSegment, WordType } from '../types/index';
 
@@ -173,18 +173,8 @@ const WordEditor: React.FC<WordEditorProps> = ({
               <span className="text-xs font-medium">{isSelectionDeleted ? '恢复' : '删除'}</span>
             </button>
             
-            <div className="w-[1px] h-4 bg-zinc-700"></div>
+            {/* <div className="w-[1px] h-4 bg-zinc-700"></div> */}
             
-            <button
-              onClick={handleAiCorrection}
-              className="flex items-center space-x-2 px-3 py-2 hover:bg-zinc-700 text-zinc-300 transition-colors group"
-            >
-              <Wand2 size={14} className="text-purple-400 group-hover:text-purple-300" />
-              <span className="text-xs font-medium">AI改口误</span>
-              <span className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[9px] px-1 rounded ml-1">
-                试用
-              </span>
-            </button>
           </div>
         </div>
       )}
