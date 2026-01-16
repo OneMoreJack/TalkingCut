@@ -1,17 +1,18 @@
 import {
-  Check,
-  Download,
-  FileVideo,
-  FolderOpen,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Pause,
-  Play,
-  Redo2,
-  Search,
-  Trash2,
-  Undo2,
-  Zap
+    Check,
+    Download,
+    FileVideo,
+    FolderOpen,
+    PanelLeftClose,
+    PanelLeftOpen,
+    Pause,
+    Play,
+    Redo2,
+    Search,
+    Trash2,
+    Undo2,
+    X,
+    Zap
 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ModelSelector from './components/ModelSelector';
@@ -38,7 +39,8 @@ const App: React.FC = () => {
     updateDuration,
     updateSettings,
     modelSize,
-    setModelSize
+    setModelSize,
+    cancelTranscribe
   } = useProject();
 
   const modelDownload = useModelDownload();
@@ -387,17 +389,31 @@ const App: React.FC = () => {
         </div>
 
         {status.step !== 'idle' && (
-          <div className="mt-auto space-y-2">
-            <div className="flex justify-between text-xs text-zinc-400">
-              <span className="capitalize">{status.step}: {status.message}</span>
-              <span>{Math.round(status.progress)}%</span>
+          <div className="mt-auto p-4 bg-zinc-900/50 rounded-xl border border-zinc-800/50 space-y-3">
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-[10px] uppercase tracking-wider font-bold text-zinc-500">
+                <span>{status.step}</span>
+                <span className="text-indigo-400">{Math.round(status.progress)}%</span>
+              </div>
+              <div className="text-xs text-zinc-400 truncate" title={status.message}>
+                {status.message}
+              </div>
             </div>
-            <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+            
+            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden shadow-inner">
               <div 
-                className="h-full bg-indigo-500 transition-all duration-300" 
+                className="h-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)] transition-all duration-300" 
                 style={{ width: `${status.progress}%` }}
               ></div>
             </div>
+
+            <button
+              onClick={cancelTranscribe}
+              className="w-full flex items-center justify-center space-x-1.5 py-1.5 bg-red-500/5 hover:bg-red-500/10 text-red-500/80 hover:text-red-500 rounded-lg text-[10px] font-bold uppercase tracking-tight transition-all border border-red-500/10 hover:border-red-500/20"
+            >
+              <X size={12} />
+              <span>Cancel Transcription</span>
+            </button>
           </div>
         )}
       </aside>

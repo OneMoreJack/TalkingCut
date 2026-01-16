@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Cpu, Download, HardDrive, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Cpu, Download, HardDrive, Trash2, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { DownloadProgress, ModelWithStatus } from '../hooks/useModelDownload';
 
@@ -92,9 +92,21 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         {/* Local Download Progress Bar (Mini) */}
         {isDownloading && downloadProgress?.modelId === currentModelId && (
           <div className="mt-3 space-y-1">
-            <div className="flex justify-between text-[10px] text-zinc-500">
+            <div className="flex justify-between items-center text-[10px] text-zinc-500">
               <span>Downloading...</span>
-              <span>{downloadProgress.percent}%</span>
+              <div className="flex items-center space-x-2">
+                <span>{downloadProgress.percent}%</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCancel();
+                  }}
+                  className="p-0.5 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 rounded transition-colors"
+                  title="Cancel download"
+                >
+                  <X size={12} />
+                </button>
+              </div>
             </div>
             <div className="w-full bg-zinc-800 rounded-full h-1 overflow-hidden">
               <div 

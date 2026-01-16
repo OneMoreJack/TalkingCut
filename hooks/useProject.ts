@@ -224,6 +224,12 @@ export const useProject = () => {
     setProject(prev => prev ? { ...prev, duration } : null);
   }, [project]);
 
+  const cancelTranscribe = useCallback(async () => {
+    if (!window.electronAPI) return;
+    await window.electronAPI.transcribe.cancel();
+    setStatus({ step: 'idle', progress: 0, message: 'Cancelled' });
+  }, []);
+
   return {
     project,
     status,
@@ -241,6 +247,7 @@ export const useProject = () => {
     updateDuration,
     updateSettings,
     modelSize,
-    setModelSize
+    setModelSize,
+    cancelTranscribe
   };
 };
