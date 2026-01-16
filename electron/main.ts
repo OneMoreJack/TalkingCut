@@ -62,7 +62,13 @@ function createWindow(): void {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    // In production, use app.getAppPath() to get the correct base path
+    const appPath = app.getAppPath();
+    const indexPath = path.join(appPath, 'dist', 'index.html');
+    console.log('[Main] Loading production build from:', indexPath);
+    console.log('[Main] __dirname:', __dirname);
+    console.log('[Main] app.getAppPath():', appPath);
+    mainWindow.loadFile(indexPath);
   }
 
   mainWindow.on('closed', () => {

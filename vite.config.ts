@@ -60,7 +60,9 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
-      emptyOutDir: true
-    }
+      emptyOutDir: true,
+    },
+    // Use relative paths for assets in production (required for Electron's file:// protocol)
+    base: './',
   };
 });
