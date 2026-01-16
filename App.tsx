@@ -49,9 +49,6 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const skipFlag = useRef(false);
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
-  const [originalVideoSrc, setOriginalVideoSrc] = useState<string | null>(null);
-  const [isPreviewProcessing, setIsPreviewProcessing] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('talkingcut_sidebar_open');
     return saved !== null ? saved === 'true' : true;
@@ -69,6 +66,7 @@ const App: React.FC = () => {
   const [isDraggingTimeline, setIsDraggingTimeline] = useState(false);
   const [exportSuccessPath, setExportSuccessPath] = useState<string | null>(null);
   const [platform, setPlatform] = useState<string>('darwin');
+  const [timelineSeekTime, setTimelineSeekTime] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (window.electronAPI) {
@@ -189,21 +187,13 @@ const App: React.FC = () => {
     return generateCutList(project);
   }, [project?.cutRanges, project?.settings.paddingStart, project?.settings.paddingEnd]);
 
-  const handleApply = async () => {
-    if (!project) return;
+  const handlePreview = () => {
+    if (!project || !videoRef.current) return;
     
-    // Always enable live preview and restart playback
-    setIsPreviewMode(true);
-    
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play().catch(e => console.warn('Play blocked:', e));
-    }
+    // Seek to beginning and start playback to preview the edits
+    videoRef.current.currentTime = 0;
+    videoRef.current.play().catch(e => console.warn('Play blocked:', e));
     setCurrentTime(0);
-  };
-
-  const exitPreview = () => {
-    setIsPreviewMode(false);
   };
 
 
@@ -260,10 +250,16 @@ const App: React.FC = () => {
       videoRef.current.currentTime = time;
     }
     setCurrentTime(time);
+    // Trigger timeline scroll to center this time
+    setTimelineSeekTime(time);
   };
 
   const handleSelectionChange = (range: { start: number; end: number } | null) => {
     setSelectionRange(range);
+    // Scroll timeline to show selection start
+    if (range) {
+      setTimelineSeekTime(range.start);
+    }
   };
 
   const handleLoadedMetadata = () => {
@@ -507,9 +503,9 @@ const App: React.FC = () => {
                         setCurrentTime(time);
                       }
 
-                      // Live Preview Skipping Logic
+                      // Auto-Skip Logic: Always active when there are deleted sections
                       // Suspend skipping when dragging timeline to avoid jumping
-                      if (isPreviewMode && !skipFlag.current && !isDraggingTimeline) {
+                      if (!skipFlag.current && !isDraggingTimeline && activeCuts.length > 0) {
                         const inCut = activeCuts.some(cut => time >= cut.start && time < cut.end);
                         if (!inCut) {
                           const nextCut = activeCuts.find(cut => cut.start > time);
@@ -527,22 +523,6 @@ const App: React.FC = () => {
                       }
                   }}
                 />
-                
-                {isPreviewMode && (
-                  <div className="absolute top-4 right-4 px-3 py-1 bg-zinc-700 text-white text-[10px] font-bold rounded-full shadow-lg flex items-center space-x-1.5 animate-pulse">
-                    <Check size={12} />
-                    <span>PREVIEW MODE</span>
-                  </div>
-                )}
-                
-                  {isPreviewMode && (
-                    <button 
-                      onClick={exitPreview}
-                      className="absolute top-4 left-4 px-3 py-1 bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white rounded-full text-[10px] font-bold uppercase transition-all flex items-center space-x-1 border border-red-600/30"
-                    >
-                      <span>Exit Preview</span>
-                    </button>
-                  )}
                 </div>
             ) : (
                 <div className="flex flex-col items-center text-zinc-700">
@@ -560,16 +540,12 @@ const App: React.FC = () => {
             {/* Left: Transcription & Cut Actions */}
             <div className="flex items-center space-x-3 w-1/3">
               <button
-                disabled={!project || isPreviewProcessing}
-                onClick={handleApply}
+                disabled={!project}
+                onClick={handlePreview}
                 className="flex items-center space-x-2 px-4 py-2 bg-zinc-500/10 hover:bg-zinc-500/20 text-zinc-300 rounded-lg text-sm font-semibold transition-colors disabled:opacity-30 border border-zinc-500/20"
               >
-                {isPreviewProcessing ? (
-                  <div className="w-4 h-4 border-2 border-zinc-400/30 border-t-zinc-300 rounded-full animate-spin" />
-                ) : (
-                  <Zap size={14} className="fill-current" />
-                )}
-                <span>Apply</span>
+                <Play size={14} className="fill-current" />
+                <span>Preview</span>
               </button>
 
               <button 
@@ -635,6 +611,7 @@ const App: React.FC = () => {
                   onUpdateCutRanges={updateCutRanges}
                   onStatusChange={(status) => setIsDraggingTimeline(status.isDragging)}
                   isPlaying={isPlaying}
+                  seekTime={timelineSeekTime}
                 />
               )
             ) : (

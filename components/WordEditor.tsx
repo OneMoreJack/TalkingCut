@@ -57,55 +57,69 @@ const WordEditor: React.FC<WordEditorProps> = ({
     return result;
   }, [segments]);
 
+  // Track if we just clicked a silence block (to prevent selectionchange from clearing it)
+  const silenceClickedRef = useRef(false);
+  // Track last valid selection time to prevent race conditions
+  const lastValidSelectionRef = useRef(0);
+
   // Selection Handling
   const handleSelectionChange = () => {
     const selection = window.getSelection();
-    if (!selection || selection.isCollapsed) {
-      setTimeout(() => {
-        if (!window.getSelection()?.toString()) {
-           setSelectedIds([]);
-           setSelectionRect(null);
-           onSelectionChange(null);
+    
+    // CASE 1: Active browser selection
+    if (selection && !selection.isCollapsed) {
+      const range = selection.getRangeAt(0);
+      const container = containerRef.current;
+      if (!container || !container.contains(range.commonAncestorContainer)) return;
+
+      const ids: string[] = [];
+      const wordSpans = container.querySelectorAll('[data-word-id]');
+      
+      wordSpans.forEach((span) => {
+        if (selection.containsNode(span, true)) {
+          const id = span.getAttribute('data-word-id');
+          if (id) ids.push(id);
         }
-      }, 100);
+      });
+
+      if (ids.length > 0) {
+        lastValidSelectionRef.current = Date.now();
+        setSelectedIds(ids);
+        
+        const rect = range.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        
+        setSelectionRect({
+          top: rect.bottom - containerRect.top + 8,
+          left: rect.left - containerRect.left + rect.width / 2
+        });
+
+        const selectedSegments = segments.filter(s => ids.includes(s.id));
+        if (selectedSegments.length > 0) {
+          const start = Math.min(...selectedSegments.map(s => s.start));
+          const end = Math.max(...selectedSegments.map(s => s.end));
+          onSelectionChange({ start, end });
+        }
+      }
       return;
     }
 
-    const range = selection.getRangeAt(0);
-    const container = containerRef.current;
-    if (!container) return;
+    // CASE 2: Collapsed selection (click or end of drag)
+    // We don't clear immediately here because handleContainerClick or handleSilenceClick handles clicks.
+    // However, if the browser selection is cleared via keyboard or other means, 
+    // we want a small delay to catch that.
+    const timeSinceLastSelection = Date.now() - lastValidSelectionRef.current;
+    if (timeSinceLastSelection > 500 && !silenceClickedRef.current && selectedIds.length > 0) {
+      // Check if we have a silence segment - these are manual and shouldn't be affected by text selection changes
+      const hasSilence = segments.some(s => selectedIds.includes(s.id) && s.type === WordType.SILENCE);
+      if (hasSilence) return;
 
-    if (!container.contains(range.commonAncestorContainer)) return;
-
-    const ids: string[] = [];
-    const wordSpans = container.querySelectorAll('[data-word-id]');
-    
-    wordSpans.forEach((span) => {
-      if (selection.containsNode(span, true)) {
-        const id = span.getAttribute('data-word-id');
-        if (id) ids.push(id);
+      // Only clear if the text selection is truly gone
+      if (!selection || selection.isCollapsed) {
+        setSelectedIds([]);
+        setSelectionRect(null);
+        onSelectionChange(null);
       }
-    });
-
-    if (ids.length > 0) {
-      setSelectedIds(ids);
-      const rect = range.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      
-      setSelectionRect({
-        top: rect.bottom - containerRect.top + 8,
-        left: rect.left - containerRect.left + rect.width / 2
-      });
-
-      // Calculate time range for timeline linkage
-      const selectedSegments = segments.filter(s => ids.includes(s.id));
-      if (selectedSegments.length > 0) {
-        const start = Math.min(...selectedSegments.map(s => s.start));
-        const end = Math.max(...selectedSegments.map(s => s.end));
-        onSelectionChange({ start, end });
-      }
-    } else {
-      onSelectionChange(null);
     }
   };
 
@@ -114,7 +128,7 @@ const WordEditor: React.FC<WordEditorProps> = ({
     return () => {
       document.removeEventListener('selectionchange', handleSelectionChange);
     };
-  }, []);
+  }, [segments, selectedIds]); // Add dependencies to ensure correct state in handler
 
   const handleDeleteSelection = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -136,16 +150,49 @@ const WordEditor: React.FC<WordEditorProps> = ({
   // Render a silence block inline
   const renderSilence = (word: WordSegment) => {
     const duration = word.duration || (word.end - word.start);
+    const isSelected = selectedIds.includes(word.id);
+    
+    const handleSilenceClick = (e: React.MouseEvent<HTMLSpanElement>) => {
+      e.stopPropagation();
+      
+      // Mark that we just clicked a silence (to prevent selectionchange from clearing)
+      silenceClickedRef.current = true;
+      setTimeout(() => { silenceClickedRef.current = false; }, 300);
+      
+      // Clear any existing browser text selection to avoid confusion
+      window.getSelection()?.removeAllRanges();
+      
+      // Seek video to this position
+      onWordClick(word.start);
+      
+      // Select this silence segment
+      setSelectedIds([word.id]);
+      
+      // Calculate floating menu position
+      const rect = e.currentTarget.getBoundingClientRect();
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      if (containerRect) {
+        setSelectionRect({
+          top: rect.bottom - containerRect.top + 8,
+          left: rect.left - containerRect.left + rect.width / 2
+        });
+      }
+      
+      // Update selection range for timeline sync
+      onSelectionChange({ start: word.start, end: word.end });
+    };
+    
     return (
       <span
         key={word.id}
         data-word-id={word.id}
-        onClick={() => onWordClick(word.start)}
+        onClick={handleSilenceClick}
         className={`
           inline mx-1 px-1.5 py-0.5 text-xs text-zinc-500 
           bg-zinc-800/50 border border-dashed border-zinc-700 rounded
           cursor-pointer hover:bg-zinc-700/50 transition-colors
           ${word.deleted ? 'opacity-30 line-through' : ''}
+          ${isSelected ? 'ring-2 ring-zinc-400 bg-zinc-700/50' : ''}
         `}
       >
         [...{duration.toFixed(1)}s]
@@ -153,10 +200,28 @@ const WordEditor: React.FC<WordEditorProps> = ({
     );
   };
 
+  // Clear selection when clicking on container (but not on silence blocks)
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Don't clear if clicking on a word/silence span or if there's an active text selection
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-word-id]')) return;
+    
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed) return;
+
+    // Clear selection if there's a silence selected or we really intended to click background
+    if (selectedIds.length > 0 && selectionRect) {
+      setSelectedIds([]);
+      setSelectionRect(null);
+      onSelectionChange(null);
+    }
+  };
+
   return (
     <div 
       ref={containerRef}
       className="p-8 max-w-5xl mx-auto relative pb-32"
+      onClick={handleContainerClick}
     >
       {/* Floating Action Menu for Selection */}
       {selectionRect && selectedIds.length > 0 && (

@@ -15,6 +15,7 @@ interface TimelineProps {
   onUpdateCutRanges: (ranges: { id: string; start: number; end: number }[]) => void;
   onStatusChange?: (status: { isDragging: boolean }) => void;
   isPlaying?: boolean;
+  seekTime?: number; // When this changes, scroll to center this time
 }
 
 const Timeline: React.FC<TimelineProps> = ({ 
@@ -29,7 +30,8 @@ const Timeline: React.FC<TimelineProps> = ({
   cutRanges,
   onUpdateCutRanges,
   onStatusChange,
-  isPlaying = false
+  isPlaying = false,
+  seekTime
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -108,6 +110,25 @@ const Timeline: React.FC<TimelineProps> = ({
       container.scrollLeft = 0;
     }
   }, [currentTime, zoom, duration, dragging, isPlaying]);
+
+  // Scroll to seekTime when it changes (from word clicks or selection)
+  useEffect(() => {
+    if (seekTime === undefined || !containerRef.current || duration === 0) return;
+    const container = containerRef.current;
+    
+    const totalWidth = container.scrollWidth;
+    const viewportWidth = container.clientWidth;
+    const targetX = (seekTime / duration) * totalWidth;
+    
+    // Center the target time in the viewport
+    const targetScroll = targetX - viewportWidth / 2;
+    const maxScroll = totalWidth - viewportWidth;
+    
+    container.scrollTo({
+      left: Math.max(0, Math.min(maxScroll, targetScroll)),
+      behavior: 'smooth'
+    });
+  }, [seekTime, duration]);
 
   const handleClick = (e: React.MouseEvent) => {
     // If we just finished a drag, don't trigger a click/seek
