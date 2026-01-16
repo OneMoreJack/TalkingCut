@@ -39,9 +39,17 @@ const Timeline: React.FC<TimelineProps> = ({
   
   // Dragging state
   const [dragging, setDragging] = useState<{
-    type: 'selection-left' | 'selection-right' | 'deleted-left' | 'deleted-right';
+    type: 'selection-left' | 'selection-right' | 'deleted-left' | 'deleted-right' | 'deleted-move' | 'deleted-create';
     blockId?: string;
-    originalRange?: { start: number; end: number };
+    startPoint?: { x: number; time: number }; // Initial click position
+    originalRange?: { start: number; end: number }; // Initial range for move/create
+  } | null>(null);
+
+  // Context Menu state
+  const [contextMenu, setContextMenu] = useState<{ 
+    x: number; 
+    y: number; 
+    blockId: string;
   } | null>(null);
 
   // Ref to track if we were just dragging to prevent handleClick from firing
@@ -151,10 +159,19 @@ const Timeline: React.FC<TimelineProps> = ({
     return (x / totalWidth) * duration;
   };
 
-  const handleDragStart = (e: React.MouseEvent, type: any, blockId?: string) => {
+  const handleDragStart = (e: React.MouseEvent, type: any, blockId?: string, extra?: any) => {
     e.stopPropagation();
-    setDragging({ type, blockId });
-    wasDraggingRef.current = true; // Mark that a drag has started
+    const rect = containerRef.current!.getBoundingClientRect();
+    const x = e.clientX - rect.left + containerRef.current!.scrollLeft;
+    const time = getTimeFromX(x);
+
+    setDragging({ 
+      type, 
+      blockId, 
+      startPoint: { x, time },
+      originalRange: extra?.range 
+    });
+    wasDraggingRef.current = false; // Reset to false, will become true on move
     onStatusChange?.({ isDragging: true });
   };
 
@@ -166,11 +183,36 @@ const Timeline: React.FC<TimelineProps> = ({
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left + containerRef.current.scrollLeft;
       const newTime = Math.max(0, Math.min(duration, getTimeFromX(x)));
+      
+      // If we move more than 3 pixels, it's a drag
+      if (dragging.startPoint && Math.abs(x - dragging.startPoint.x) > 3) {
+        wasDraggingRef.current = true;
+      }
 
       if (dragging.type === 'selection-left' && selectionRange) {
         onSelectionChange({ start: Math.min(newTime, selectionRange.end - 0.05), end: selectionRange.end });
       } else if (dragging.type === 'selection-right' && selectionRange) {
         onSelectionChange({ start: selectionRange.start, end: Math.max(newTime, selectionRange.start + 0.05) });
+      } else if (dragging.type === 'deleted-move' && dragging.blockId && dragging.originalRange && dragging.startPoint) {
+        const delta = newTime - dragging.startPoint.time;
+        const newStart = Math.max(0, dragging.originalRange.start + delta);
+        const newEnd = Math.min(duration, dragging.originalRange.end + delta);
+        
+        // Keep duration constant
+        const actualDelta = newStart - dragging.originalRange.start;
+        const finalEnd = dragging.originalRange.end + actualDelta;
+
+        const newCutRanges = cutRanges.map(r => 
+          r.id === dragging.blockId ? { ...r, start: newStart, end: finalEnd } : r
+        );
+        onUpdateCutRanges(newCutRanges);
+      } else if (dragging.type === 'deleted-create' && dragging.startPoint) {
+        const startTime = Math.min(dragging.startPoint.time, newTime);
+        const endTime = Math.max(dragging.startPoint.time, newTime);
+        
+        // Show temporary selection or create/update a temporary range
+        // For simplicity, we update the selectionRange during creation
+        onSelectionChange({ start: startTime, end: endTime });
       } else if (dragging.type.startsWith('deleted') && dragging.blockId) {
         const rangeIndex = cutRanges.findIndex(r => r.id === dragging.blockId);
         if (rangeIndex === -1) return;
@@ -190,6 +232,18 @@ const Timeline: React.FC<TimelineProps> = ({
     };
 
     const handleMouseUp = () => {
+      if (dragging.type === 'deleted-create' && selectionRange && wasDraggingRef.current) {
+        const duration = selectionRange.end - selectionRange.start;
+        if (duration > 0.1) {
+          const newRange = {
+            id: `manual-${Date.now()}`,
+            start: selectionRange.start,
+            end: selectionRange.end
+          };
+          onUpdateCutRanges([...cutRanges, newRange]);
+          onSelectionChange(null);
+        }
+      }
       setDragging(null);
       onStatusChange?.({ isDragging: false });
     };
@@ -204,10 +258,19 @@ const Timeline: React.FC<TimelineProps> = ({
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="bg-zinc-900 border-t border-zinc-800 overflow-hidden select-none relative">
+    <div 
+      className="bg-zinc-900 border-t border-zinc-800 overflow-hidden select-none relative"
+      onClick={() => setContextMenu(null)}
+    >
       <div 
         ref={containerRef}
         onClick={handleClick}
+        onMouseDown={(e) => {
+          // Only start a creation drag if clicking on background (not on a block or handle)
+          if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'CANVAS') {
+            handleDragStart(e, 'deleted-create');
+          }
+        }}
         className="h-24 bg-zinc-950 relative cursor-crosshair overflow-x-auto scrollbar-hide"
       >
         <div 
@@ -228,10 +291,26 @@ const Timeline: React.FC<TimelineProps> = ({
             return (
               <div 
                 key={block.id}
-                className="absolute inset-y-0 bg-zinc-200/[0.3] z-10 group/del"
+                className="absolute inset-y-0 bg-zinc-200/[0.3] z-10 group/del cursor-move"
                 style={{ 
                   left: `${(block.start / duration) * 100}%`,
                   width: `${((block.end - block.start) / duration) * 100}%`
+                }}
+                onMouseDown={(e) => {
+                  // Only move if clicking the block itself, not the handles
+                  if ((e.target as HTMLElement).classList.contains('group/del')) {
+                    handleDragStart(e, 'deleted-move', block.id, { range: { start: block.start, end: block.end } });
+                  }
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const containerRect = containerRef.current!.getBoundingClientRect();
+                  setContextMenu({
+                    x: e.clientX - containerRect.left,
+                    y: e.clientY - containerRect.top,
+                    blockId: block.id
+                  });
                 }}
               >
                 {/* Left Handle */}
@@ -307,6 +386,24 @@ const Timeline: React.FC<TimelineProps> = ({
           </div>
         </div>
       </div>
+      {/* Right-click Context Menu */}
+      {contextMenu && (
+        <div 
+          className="absolute z-[100] bg-zinc-800 border border-zinc-700 rounded shadow-xl overflow-hidden py-1 min-w-[100px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              onUpdateCutRanges(cutRanges.filter(r => r.id !== contextMenu.blockId));
+              setContextMenu(null);
+            }}
+            className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-zinc-700 transition-colors flex items-center space-x-2"
+          >
+            <span>删除片段</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

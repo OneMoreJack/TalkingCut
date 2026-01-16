@@ -244,6 +244,48 @@ const App: React.FC = () => {
     };
   }, [project?.id]);
 
+  // Robust Auto-Skip Loop (High Frequency)
+  useEffect(() => {
+    if (!videoRef.current || isDraggingTimeline || activeCuts.length === 0) return;
+    
+    let rafId: number;
+    const checkSkip = () => {
+      const v = videoRef.current;
+      if (!v || v.paused || skipFlag.current) {
+        rafId = requestAnimationFrame(checkSkip);
+        return;
+      }
+
+      const time = v.currentTime;
+      const inCut = activeCuts.some(cut => time >= cut.start && time < cut.end);
+      
+      if (!inCut) {
+        const nextCut = activeCuts.find(cut => cut.start > time);
+        if (nextCut) {
+          skipFlag.current = true;
+          v.currentTime = nextCut.start;
+          setCurrentTime(nextCut.start);
+          setTimeout(() => { skipFlag.current = false; }, 50);
+        } else {
+          // Hit end of all cuts
+          v.pause();
+          setIsPlaying(false);
+          const lastCut = activeCuts[activeCuts.length - 1];
+          v.currentTime = lastCut.end;
+          setCurrentTime(lastCut.end);
+        }
+      } else {
+        // Update current time state for UI syncing (smoother than onTimeUpdate)
+        setCurrentTime(time);
+      }
+      
+      rafId = requestAnimationFrame(checkSkip);
+    };
+
+    rafId = requestAnimationFrame(checkSkip);
+    return () => cancelAnimationFrame(rafId);
+  }, [isPlaying, activeCuts, isDraggingTimeline]);
+
   // Handle word and timeline clicks
   const handleJumpToTime = (time: number) => {
     if (videoRef.current) {
@@ -494,32 +536,9 @@ const App: React.FC = () => {
                   onLoadedMetadata={handleLoadedMetadata}
                   onClick={togglePlay}
                   onTimeUpdate={(e) => {
-                      const v = e.currentTarget;
-                      const time = v.currentTime;
-                      
                       if (!skipFlag.current) {
-                        // Note: currentTime is also updated by the rAF loop for smoothness
-                        // but we keep this as a fallback and to trigger immediate updates on pause/seek
-                        setCurrentTime(time);
-                      }
-
-                      // Auto-Skip Logic: Always active when there are deleted sections
-                      // Suspend skipping when dragging timeline to avoid jumping
-                      if (!skipFlag.current && !isDraggingTimeline && activeCuts.length > 0) {
-                        const inCut = activeCuts.some(cut => time >= cut.start && time < cut.end);
-                        if (!inCut) {
-                          const nextCut = activeCuts.find(cut => cut.start > time);
-                          if (nextCut) {
-                            skipFlag.current = true;
-                            v.currentTime = nextCut.start;
-                            setTimeout(() => { skipFlag.current = false; }, 50);
-                          } else if (activeCuts.length > 0) {
-                            // Hit end of all cuts
-                            v.pause();
-                            const lastCut = activeCuts[activeCuts.length - 1];
-                            v.currentTime = lastCut.end;
-                          }
-                        }
+                        // Fallback for when rAF loop is not active (paued/seeking)
+                        setCurrentTime(e.currentTarget.currentTime);
                       }
                   }}
                 />
