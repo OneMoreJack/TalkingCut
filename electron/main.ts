@@ -9,9 +9,10 @@
  */
 
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getModelById, MODEL_DEFINITIONS } from './models/modelDefinitions';
+import { getModelInfoWithUrls, MIRROR_CONFIG, MirrorSource, MODEL_DEFINITIONS } from './models/modelDefinitions';
 import { DownloadManager } from './services/downloadManager';
 import { FFmpegBridge } from './services/ffmpegBridge';
 import { FileManager } from './services/fileManager';
@@ -31,6 +32,26 @@ const ffmpegBridge = new FFmpegBridge();
 const fileManager = new FileManager();
 const modelManager = new ModelManager();
 const downloadManager = new DownloadManager(modelManager.getModelsDir());
+
+// Simple persistent config
+let mirrorSource: MirrorSource = 'huggingface';
+const configPath = path.join(app.getPath('userData'), 'config.json');
+try {
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    if (config.mirrorSource) mirrorSource = config.mirrorSource;
+  }
+} catch (e) {
+  console.warn('[Main] Failed to load config:', e);
+}
+
+function saveConfig() {
+  try {
+    fs.writeFileSync(configPath, JSON.stringify({ mirrorSource }));
+  } catch (e) {
+    console.warn('[Main] Failed to save config:', e);
+  }
+}
 
 // ============================================================================
 // Window Management
@@ -136,9 +157,13 @@ function setupIpcHandlers(): void {
       });
 
       // Run Python transcription
+      const isInstalled = await modelManager.getModelStatus({ id: options?.model || 'base' } as any).then(s => s.installed);
+
       const result = await pythonBridge.transcribe(audioPath, {
         model: options?.model || 'base',
         language: options?.language,
+        offline: isInstalled, // Force offline if model is already there
+        mirror: MIRROR_CONFIG[mirrorSource],
         onProgress: (progress, message) => {
           event.sender.send('transcribe:progress', {
             step: 'transcribing',
@@ -226,12 +251,19 @@ function setupIpcHandlers(): void {
     const statuses = await modelManager.listModels();
     return {
       definitions: MODEL_DEFINITIONS,
-      statuses
+      statuses,
+      mirrorSource
     };
   });
 
+  ipcMain.handle('model:setMirror', (_event, source: MirrorSource) => {
+    mirrorSource = source;
+    saveConfig();
+    return { success: true };
+  });
+
   ipcMain.handle('model:download', async (_event, modelId: string) => {
-    const model = getModelById(modelId);
+    const model = getModelInfoWithUrls(modelId, mirrorSource);
     if (!model) {
       return { success: false, error: 'Model not found' };
     }

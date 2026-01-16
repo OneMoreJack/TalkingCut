@@ -16,8 +16,12 @@ import { DownloadProgress, ModelFile, ModelInfo } from '../models/modelDefinitio
 interface DownloadState {
   modelId: string;
   currentFile: string;
+  // Per-file tracking
   downloaded: number;
   total: number;
+  // Combined model tracking
+  totalModelSize: number;
+  downloadedSoFar: number;  // Bytes already completed from previous files
   startTime: number;
   aborted: boolean;
   request: http.ClientRequest | null;
@@ -41,44 +45,64 @@ export class DownloadManager {
    */
   async downloadModel(model: ModelInfo): Promise<void> {
     const modelDir = path.join(this.modelsDir, model.id);
+    const progressPath = path.join(this.modelsDir, `${model.id}.progress`);
+
     console.log(`[DownloadManager] Starting download for ${model.id}`);
     console.log(`[DownloadManager] Model dir: ${modelDir}`);
     console.log(`[DownloadManager] Files to download: ${model.files.map(f => f.name).join(', ')}`);
 
-    // Force cleanup: delete any existing model directory and progress files
-    // This ensures a clean download even if previous download was interrupted
+    // Check if model is already complete (has model.bin AND no progress file)
+    // Progress file indicates incomplete download
     if (fs.existsSync(modelDir)) {
       const stats = fs.lstatSync(modelDir);
-      // Also check if it's a symlink - if so, remove it
+
       if (stats.isSymbolicLink()) {
-        fs.unlinkSync(modelDir);
-        console.log(`[DownloadManager] Removed symlink for ${model.id}`);
-      } else {
-        const files = fs.readdirSync(modelDir);
-        if (files.length === 0 || !files.includes('model.bin')) {
-          // Empty or incomplete - remove and start fresh
-          fs.rmSync(modelDir, { recursive: true });
-          console.log(`[DownloadManager] Cleaned up incomplete model directory for ${model.id}`);
-        } else {
-          console.log(`[DownloadManager] Model ${model.id} already has model.bin, skipping download`);
-          // Emit completion immediately
-          this.emitProgress({
-            modelId: model.id,
-            fileName: 'all',
-            downloaded: 0,
-            total: 0,
-            percent: 100,
-            speed: 0,
-            eta: 0,
-            status: 'completed'
-          });
-          return;
-        }
+        // Symlink = model is from cache, fully complete
+        console.log(`[DownloadManager] Model ${model.id} is a symlink (cached), skipping download`);
+        this.emitProgress({
+          modelId: model.id,
+          fileName: 'all',
+          downloaded: 0,
+          total: 0,
+          percent: 100,
+          speed: 0,
+          eta: 0,
+          status: 'completed'
+        });
+        return;
+      }
+
+      const files = fs.readdirSync(modelDir);
+      const hasModelBin = files.includes('model.bin');
+      const hasProgressFile = fs.existsSync(progressPath);
+
+      console.log(`[DownloadManager] Directory check: hasModelBin=${hasModelBin}, hasProgressFile=${hasProgressFile}`);
+
+      // Only skip download if model.bin exists AND there's no progress file
+      // Progress file = previous download was incomplete
+      if (hasModelBin && !hasProgressFile) {
+        console.log(`[DownloadManager] Model ${model.id} is complete (model.bin exists, no progress file), skipping download`);
+        this.emitProgress({
+          modelId: model.id,
+          fileName: 'all',
+          downloaded: 0,
+          total: 0,
+          percent: 100,
+          speed: 0,
+          eta: 0,
+          status: 'completed'
+        });
+        return;
+      }
+
+      // If directory exists but is empty or has no model.bin, clean it up
+      if (!hasModelBin) {
+        fs.rmSync(modelDir, { recursive: true });
+        console.log(`[DownloadManager] Cleaned up incomplete model directory for ${model.id}`);
       }
     }
 
-    // Always clean up progress file to ensure fresh download
-    const progressPath = path.join(this.modelsDir, `${model.id}.progress`);
+    // Clean up progress file to ensure fresh download start
     if (fs.existsSync(progressPath)) {
       fs.unlinkSync(progressPath);
       console.log(`[DownloadManager] Cleaned up stale progress file for ${model.id}`);
@@ -92,8 +116,12 @@ export class DownloadManager {
 
     let startFromFile = 0;
 
+    // Calculate total model size for combined progress
+    const totalModelSize = model.files.reduce((sum, f) => sum + f.size, 0);
+    let downloadedSoFar = 0;
+
     // Download each file
-    console.log(`[DownloadManager] Starting file downloads for ${model.id}`);
+    console.log(`[DownloadManager] Starting file downloads for ${model.id}, total size: ${totalModelSize} bytes`);
     for (let i = startFromFile; i < model.files.length; i++) {
       const file = model.files[i];
       console.log(`[DownloadManager] Downloading file ${i + 1}/${model.files.length}: ${file.name}`);
@@ -101,7 +129,10 @@ export class DownloadManager {
       // Save progress for resume
       fs.writeFileSync(progressPath, JSON.stringify({ fileIndex: i }));
 
-      await this.downloadFile(model.id, file, modelDir);
+      await this.downloadFile(model.id, file, modelDir, totalModelSize, downloadedSoFar);
+
+      // Update downloaded bytes after each file completes
+      downloadedSoFar += file.size;
 
       if (this.currentDownload?.aborted) {
         throw new Error('Download cancelled');
@@ -132,8 +163,16 @@ export class DownloadManager {
 
   /**
    * Download a single file with resume support
+   * @param totalModelSize - Total size of all model files combined (for unified progress)
+   * @param downloadedSoFar - Bytes already downloaded from previous files
    */
-  private async downloadFile(modelId: string, file: ModelFile, targetDir: string): Promise<void> {
+  private async downloadFile(
+    modelId: string,
+    file: ModelFile,
+    targetDir: string,
+    totalModelSize: number,
+    downloadedSoFar: number
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       const filePath = path.join(targetDir, file.name);
       const partialPath = `${filePath}.partial`;
@@ -172,6 +211,8 @@ export class DownloadManager {
         currentFile: file.name,
         downloaded: existingSize,
         total: file.size,
+        totalModelSize,
+        downloadedSoFar,
         startTime: Date.now(),
         aborted: false,
         request: null
@@ -182,9 +223,14 @@ export class DownloadManager {
 
         // Handle redirects
         if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307 || response.statusCode === 308) {
-          const redirectUrl = response.headers.location;
+          let redirectUrl = response.headers.location;
           console.log(`[DownloadManager] ${file.name} redirecting to: ${redirectUrl}`);
           if (redirectUrl) {
+            // Handle relative redirects (hf-mirror returns relative URLs like /api/resolve-cache/...)
+            if (redirectUrl.startsWith('/')) {
+              redirectUrl = `${url.protocol}//${url.host}${redirectUrl}`;
+              console.log(`[DownloadManager] Resolved relative redirect to: ${redirectUrl}`);
+            }
             // Follow redirect
             this.downloadFileFromUrl(modelId, file, redirectUrl, partialPath, existingSize)
               .then(resolve)
@@ -231,18 +277,19 @@ export class DownloadManager {
           downloadedThisSession += chunk.length;
           this.currentDownload!.downloaded = existingSize + downloadedThisSession;
 
-          // Calculate progress
+          // Calculate COMBINED progress across all model files
+          const combinedDownloaded = downloadedSoFar + this.currentDownload!.downloaded;
           const elapsed = (Date.now() - startTime) / 1000;
           const speed = downloadedThisSession / elapsed;
-          const remaining = totalSize - this.currentDownload!.downloaded;
+          const remaining = totalModelSize - combinedDownloaded;
           const eta = speed > 0 ? remaining / speed : 0;
 
           this.emitProgress({
             modelId,
             fileName: file.name,
-            downloaded: this.currentDownload!.downloaded,
-            total: totalSize,
-            percent: Math.round((this.currentDownload!.downloaded / totalSize) * 100),
+            downloaded: combinedDownloaded,
+            total: totalModelSize,
+            percent: Math.min(100, Math.round((combinedDownloaded / totalModelSize) * 100)),
             speed,
             eta,
             status: 'downloading'
@@ -307,9 +354,14 @@ export class DownloadManager {
       }
 
       const request = protocol.get(url, { headers }, (response) => {
-        if (response.statusCode === 301 || response.statusCode === 302) {
-          const redirectUrl = response.headers.location;
+        // Handle redirects (including 307/308 for hf-mirror)
+        if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307 || response.statusCode === 308) {
+          let redirectUrl = response.headers.location;
           if (redirectUrl) {
+            // Handle relative redirects (hf-mirror returns relative URLs)
+            if (redirectUrl.startsWith('/')) {
+              redirectUrl = `${url.protocol}//${url.host}${redirectUrl}`;
+            }
             this.downloadFileFromUrl(modelId, file, redirectUrl, partialPath, existingSize)
               .then(resolve)
               .catch(reject);
@@ -355,7 +407,7 @@ export class DownloadManager {
             fileName: file.name,
             downloaded,
             total: totalSize,
-            percent: Math.round((downloaded / totalSize) * 100),
+            percent: Math.min(100, Math.round((downloaded / totalSize) * 100)),
             speed,
             eta,
             status: 'downloading'

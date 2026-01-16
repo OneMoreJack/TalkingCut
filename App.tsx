@@ -9,6 +9,7 @@ import {
   Play,
   Redo2,
   Search,
+  Settings,
   Trash2,
   Undo2,
   X,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ModelSelector from './components/ModelSelector';
+import SettingsModal from './components/SettingsModal';
 import Timeline from './components/Timeline';
 import WordEditor from './components/WordEditor';
 import { useModelDownload } from './hooks/useModelDownload';
@@ -47,6 +49,7 @@ const App: React.FC = () => {
 
   const [currentTime, setCurrentTime] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const skipFlag = useRef(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
@@ -348,17 +351,26 @@ const App: React.FC = () => {
         <div className="space-y-4">
           {/* Model Selector with Download Status */}
           <div className="block">
-            <span className="text-xs uppercase font-semibold text-zinc-500 mb-2 block">AI Model</span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs uppercase font-semibold text-zinc-500">AI Model</span>
+              <button 
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-1 hover:bg-zinc-800 rounded transition-colors text-zinc-500 hover:text-zinc-300"
+              >
+                <Settings size={14} />
+              </button>
+            </div>
             <div className="space-y-4">
               <ModelSelector
                 currentModelId={modelSize}
                 onSelect={(id) => setModelSize(id as ModelSize)}
-                models={modelDownload.models}
+                models={modelDownload.models.filter(m => m.status.installed)}
                 downloadProgress={modelDownload.downloadProgress}
                 onDownload={modelDownload.downloadModel}
                 onCancel={modelDownload.cancelDownload}
                 onDelete={modelDownload.deleteModel}
                 isDownloading={modelDownload.isDownloading}
+                onOpenSettings={() => setIsSettingsOpen(true)}
               />
             </div>
           </div>
@@ -692,6 +704,11 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Settings Modal */}
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+      />
     </div>
   );
 };

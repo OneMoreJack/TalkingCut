@@ -121,8 +121,11 @@ const electronAPI = {
 
   // ----- Model Management -----
   model: {
-    list: (): Promise<{ definitions: any[]; statuses: any[] }> =>
+    list: (): Promise<{ definitions: any[]; statuses: any[]; mirrorSource: string }> =>
       ipcRenderer.invoke('model:list'),
+
+    setMirror: (source: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('model:setMirror', source),
 
     download: (modelId: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('model:download', modelId),

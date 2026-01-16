@@ -267,7 +267,10 @@ const Timeline: React.FC<TimelineProps> = ({
         onClick={handleClick}
         onMouseDown={(e) => {
           // Only start a creation drag if clicking on background (not on a block or handle)
-          if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'CANVAS') {
+          const target = e.target as HTMLElement;
+          const isInteractive = target.closest('.group\\/del') || target.closest('.cursor-ew-resize');
+          
+          if (!isInteractive) {
             handleDragStart(e, 'deleted-create');
           }
         }}

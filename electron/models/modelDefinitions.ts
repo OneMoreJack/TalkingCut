@@ -45,6 +45,18 @@ export interface DownloadProgress {
   error?: string;
 }
 
+export type MirrorSource = 'huggingface' | 'hf-mirror';
+
+export const MIRROR_CONFIG = {
+  huggingface: 'https://huggingface.co',
+  'hf-mirror': 'https://hf-mirror.com'
+};
+
+export const getDownloadUrl = (repo: string, file: string, source: MirrorSource = 'huggingface') => {
+  const base = MIRROR_CONFIG[source];
+  return `${base}/${repo}/resolve/main/${file}`;
+};
+
 // HuggingFace faster-whisper models
 // Note: All 4 files are required for whisperx/faster-whisper to work correctly
 export const MODEL_DEFINITIONS: ModelInfo[] = [
@@ -58,10 +70,10 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     emoji: '🐦',
     category: 'all',
     files: [
-      { name: 'model.bin', url: 'https://hf-mirror.com/Systran/faster-whisper-tiny/resolve/main/model.bin', size: 75000000 },
-      { name: 'config.json', url: 'https://hf-mirror.com/Systran/faster-whisper-tiny/resolve/main/config.json', size: 500 },
-      { name: 'vocabulary.txt', url: 'https://hf-mirror.com/Systran/faster-whisper-tiny/resolve/main/vocabulary.txt', size: 800000 },
-      { name: 'tokenizer.json', url: 'https://hf-mirror.com/Systran/faster-whisper-tiny/resolve/main/tokenizer.json', size: 2400000 },
+      { name: 'model.bin', size: 75538270, url: '' },
+      { name: 'config.json', size: 2300, url: '' },
+      { name: 'vocabulary.txt', size: 460000, url: '' },
+      { name: 'tokenizer.json', size: 2210000, url: '' },
     ]
   },
   {
@@ -74,10 +86,10 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     emoji: '🦦',
     category: 'all',
     files: [
-      { name: 'model.bin', url: 'https://hf-mirror.com/Systran/faster-whisper-base/resolve/main/model.bin', size: 145000000 },
-      { name: 'config.json', url: 'https://hf-mirror.com/Systran/faster-whisper-base/resolve/main/config.json', size: 500 },
-      { name: 'vocabulary.txt', url: 'https://hf-mirror.com/Systran/faster-whisper-base/resolve/main/vocabulary.txt', size: 800000 },
-      { name: 'tokenizer.json', url: 'https://hf-mirror.com/Systran/faster-whisper-base/resolve/main/tokenizer.json', size: 2400000 },
+      { name: 'model.bin', size: 145000000, url: '' },
+      { name: 'config.json', size: 500, url: '' },
+      { name: 'vocabulary.txt', size: 800000, url: '' },
+      { name: 'tokenizer.json', size: 2400000, url: '' },
     ]
   },
   {
@@ -90,10 +102,10 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     emoji: '🦊',
     category: 'all',
     files: [
-      { name: 'model.bin', url: 'https://hf-mirror.com/Systran/faster-whisper-small/resolve/main/model.bin', size: 470000000 },
-      { name: 'config.json', url: 'https://hf-mirror.com/Systran/faster-whisper-small/resolve/main/config.json', size: 500 },
-      { name: 'vocabulary.txt', url: 'https://hf-mirror.com/Systran/faster-whisper-small/resolve/main/vocabulary.txt', size: 800000 },
-      { name: 'tokenizer.json', url: 'https://hf-mirror.com/Systran/faster-whisper-small/resolve/main/tokenizer.json', size: 2400000 },
+      { name: 'model.bin', size: 470000000, url: '' },
+      { name: 'config.json', size: 500, url: '' },
+      { name: 'vocabulary.txt', size: 800000, url: '' },
+      { name: 'tokenizer.json', size: 2400000, url: '' },
     ]
   },
   {
@@ -106,10 +118,10 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     emoji: '🦉',
     category: 'all',
     files: [
-      { name: 'model.bin', url: 'https://hf-mirror.com/Systran/faster-whisper-medium/resolve/main/model.bin', size: 1500000000 },
-      { name: 'config.json', url: 'https://hf-mirror.com/Systran/faster-whisper-medium/resolve/main/config.json', size: 500 },
-      { name: 'vocabulary.txt', url: 'https://hf-mirror.com/Systran/faster-whisper-medium/resolve/main/vocabulary.txt', size: 800000 },
-      { name: 'tokenizer.json', url: 'https://hf-mirror.com/Systran/faster-whisper-medium/resolve/main/tokenizer.json', size: 2400000 },
+      { name: 'model.bin', size: 1500000000, url: '' },
+      { name: 'config.json', size: 500, url: '' },
+      { name: 'vocabulary.txt', size: 800000, url: '' },
+      { name: 'tokenizer.json', size: 2400000, url: '' },
     ]
   },
   {
@@ -122,10 +134,10 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     emoji: '🦅',
     category: 'all',
     files: [
-      { name: 'model.bin', url: 'https://hf-mirror.com/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/main/model.bin', size: 1600000000 },
-      { name: 'config.json', url: 'https://hf-mirror.com/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/main/config.json', size: 500 },
-      { name: 'vocabulary.json', url: 'https://hf-mirror.com/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/main/vocabulary.json', size: 800000 },
-      { name: 'tokenizer.json', url: 'https://hf-mirror.com/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/main/tokenizer.json', size: 2400000 },
+      { name: 'model.bin', size: 1600000000, url: '' },
+      { name: 'config.json', size: 500, url: '' },
+      { name: 'vocabulary.json', size: 800000, url: '' },
+      { name: 'tokenizer.json', size: 2400000, url: '' },
     ]
   },
   {
@@ -138,13 +150,26 @@ export const MODEL_DEFINITIONS: ModelInfo[] = [
     emoji: '🐘',
     category: 'all',
     files: [
-      { name: 'model.bin', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3/resolve/main/model.bin', size: 3100000000 },
-      { name: 'config.json', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3/resolve/main/config.json', size: 500 },
-      { name: 'vocabulary.json', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3/resolve/main/vocabulary.json', size: 800000 },
-      { name: 'tokenizer.json', url: 'https://hf-mirror.com/Systran/faster-whisper-large-v3/resolve/main/tokenizer.json', size: 2400000 },
+      { name: 'model.bin', size: 3100000000, url: '' },
+      { name: 'config.json', size: 500, url: '' },
+      { name: 'vocabulary.json', size: 800000, url: '' },
+      { name: 'tokenizer.json', size: 2400000, url: '' },
     ]
   }
 ];
+
+export function getModelInfoWithUrls(modelId: string, source: MirrorSource = 'huggingface'): ModelInfo | undefined {
+  const model = MODEL_DEFINITIONS.find(m => m.id === modelId);
+  if (!model) return undefined;
+
+  return {
+    ...model,
+    files: model.files.map(f => ({
+      ...f,
+      url: getDownloadUrl(model.huggingFaceRepo, f.name, source)
+    }))
+  };
+}
 
 export function getModelById(id: string): ModelInfo | undefined {
   return MODEL_DEFINITIONS.find(m => m.id === id);

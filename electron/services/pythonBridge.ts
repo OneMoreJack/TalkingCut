@@ -13,6 +13,8 @@ import path from 'path';
 export interface TranscribeOptions {
   model?: string;
   language?: string;
+  offline?: boolean;
+  mirror?: string;
   onProgress?: (progress: number, message: string) => void;
 }
 
@@ -110,6 +112,14 @@ export class PythonBridge {
 
       if (options.language) {
         args.push('--language', options.language);
+      }
+
+      if (options.offline) {
+        args.push('--offline');
+      }
+
+      if (options.mirror) {
+        args.push('--mirror', options.mirror);
       }
 
       console.log(`[PythonBridge] Running: ${this.pythonPath} ${args.join(' ')}`);

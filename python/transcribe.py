@@ -789,10 +789,32 @@ def main():
         default=0.5,
         help="Minimum silence duration (in seconds) to mark as SILENCE segment (default: 0.5)"
     )
+
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="Force offline mode (disable HF online checks)"
+    )
+
+    parser.add_argument(
+        "--mirror",
+        help="Hugging Face mirror URL (e.g. https://hf-mirror.com)"
+    )
     
     args = parser.parse_args()
     
     print("[TalkingCut] Python engine started")
+    
+    # Handle network configuration
+    if args.mirror:
+        print(f"[TalkingCut] Setting HF_ENDPOINT to: {args.mirror}")
+        os.environ["HF_ENDPOINT"] = args.mirror
+
+    if args.offline:
+        print("[TalkingCut] Forcing offline mode (HF_HUB_OFFLINE=1)")
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
     print("[TalkingCut] Loading AI libraries...")
     
     # Validate input file
