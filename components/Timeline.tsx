@@ -273,7 +273,7 @@ const Timeline: React.FC<TimelineProps> = ({
 
           {/* Playhead Progress */}
           <div 
-            className="absolute inset-y-0 left-0 bg-indigo-500/5 border-r border-indigo-500/20 z-0 pointer-events-none"
+            className="absolute inset-y-0 left-0 bg-zinc-500/5 border-r border-zinc-500/20 z-0 pointer-events-none"
             style={{ width: `${progress}%` }}
           />
 

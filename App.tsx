@@ -1,18 +1,18 @@
 import {
-    Check,
-    Download,
-    FileVideo,
-    FolderOpen,
-    PanelLeftClose,
-    PanelLeftOpen,
-    Pause,
-    Play,
-    Redo2,
-    Search,
-    Trash2,
-    Undo2,
-    X,
-    Zap
+  Check,
+  Download,
+  FileVideo,
+  FolderOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Pause,
+  Play,
+  Redo2,
+  Search,
+  Trash2,
+  Undo2,
+  X,
+  Zap
 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ModelSelector from './components/ModelSelector';
@@ -284,7 +284,7 @@ const App: React.FC = () => {
 
         {/* Center: Project Name */}
         <div className="flex items-center space-x-2 text-zinc-400 select-none">
-          <FileVideo size={16} className="text-indigo-400" />
+          <FileVideo size={16} className="text-zinc-400" />
           <span className="text-sm font-medium tracking-tight">
             {project ? project.name : 'TalkingCut - Video Editor'}
           </span>
@@ -295,7 +295,7 @@ const App: React.FC = () => {
           <button 
             disabled={!project}
             onClick={handleExport}
-            className="flex items-center space-x-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-semibold transition-all disabled:opacity-50 shadow-md"
+            className="flex items-center space-x-2 px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white rounded-md text-xs font-semibold transition-all disabled:opacity-50 shadow-md"
           >
             <Download size={14} />
             <span>Export Final Cut</span>
@@ -340,14 +340,14 @@ const App: React.FC = () => {
                 }
                 openVideo();
               }}
-              className="relative group cursor-pointer border-2 border-dashed border-zinc-700 rounded-xl p-6 hover:border-indigo-500 transition-colors flex flex-col items-center"
+              className="relative group cursor-pointer border-2 border-dashed border-zinc-700 rounded-xl p-6 hover:border-zinc-500 transition-colors flex flex-col items-center"
             >
-              <FileVideo className="text-zinc-500 group-hover:text-indigo-400 mb-2" />
+              <FileVideo className="text-zinc-500 group-hover:text-zinc-300 mb-2" />
               <p className="text-xs text-center text-zinc-400">
                 {project ? project.name : 'Open Video File'}
               </p>
               {!modelDownload.isModelInstalled(modelSize) && (
-                <div className="mt-2 px-2 py-0.5 bg-indigo-500/20 text-indigo-400 text-[10px] rounded-full animate-pulse font-medium">
+                <div className="mt-2 px-2 py-0.5 bg-zinc-500/20 text-zinc-300 text-[10px] rounded-full animate-pulse font-medium">
                   {modelDownload.isDownloading ? 'Downloading model...' : 'Model download required'}
                 </div>
               )}
@@ -393,7 +393,7 @@ const App: React.FC = () => {
             <div className="space-y-1">
               <div className="flex justify-between items-center text-[10px] uppercase tracking-wider font-bold text-zinc-500">
                 <span>{status.step}</span>
-                <span className="text-indigo-400">{Math.round(status.progress)}%</span>
+                <span className="text-zinc-300">{Math.round(status.progress)}%</span>
               </div>
               <div className="text-xs text-zinc-400 truncate" title={status.message}>
                 {status.message}
@@ -402,14 +402,14 @@ const App: React.FC = () => {
             
             <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden shadow-inner">
               <div 
-                className="h-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)] transition-all duration-300" 
+                className="h-full bg-zinc-300 shadow-[0_0_8px_rgba(255,255,255,0.3)] transition-all duration-300" 
                 style={{ width: `${status.progress}%` }}
               ></div>
             </div>
 
             <button
               onClick={cancelTranscribe}
-              className="w-full flex items-center justify-center space-x-1.5 py-1.5 bg-red-500/5 hover:bg-red-500/10 text-red-500/80 hover:text-red-500 rounded-lg text-[10px] font-bold uppercase tracking-tight transition-all border border-red-500/10 hover:border-red-500/20"
+              className="w-full flex items-center justify-center space-x-1.5 py-1.5 bg-zinc-800/50 hover:bg-red-500/10 text-zinc-500 hover:text-red-500 rounded-lg text-[10px] font-bold uppercase tracking-tight transition-all border border-zinc-700/50 hover:border-red-500/20"
             >
               <X size={12} />
               <span>Cancel Transcription</span>
@@ -529,7 +529,7 @@ const App: React.FC = () => {
                 />
                 
                 {isPreviewMode && (
-                  <div className="absolute top-4 right-4 px-3 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-full shadow-lg flex items-center space-x-1.5 animate-pulse">
+                  <div className="absolute top-4 right-4 px-3 py-1 bg-zinc-700 text-white text-[10px] font-bold rounded-full shadow-lg flex items-center space-x-1.5 animate-pulse">
                     <Check size={12} />
                     <span>PREVIEW MODE</span>
                   </div>
@@ -562,10 +562,10 @@ const App: React.FC = () => {
               <button
                 disabled={!project || isPreviewProcessing}
                 onClick={handleApply}
-                className="flex items-center space-x-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg text-sm font-semibold transition-colors disabled:opacity-30 border border-indigo-500/20"
+                className="flex items-center space-x-2 px-4 py-2 bg-zinc-500/10 hover:bg-zinc-500/20 text-zinc-300 rounded-lg text-sm font-semibold transition-colors disabled:opacity-30 border border-zinc-500/20"
               >
                 {isPreviewProcessing ? (
-                  <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-zinc-400/30 border-t-zinc-300 rounded-full animate-spin" />
                 ) : (
                   <Zap size={14} className="fill-current" />
                 )}
@@ -586,7 +586,7 @@ const App: React.FC = () => {
             <div className="flex items-center justify-center space-x-4 w-1/3">
               <button 
                 onClick={togglePlay}
-                className="p-2.5 bg-indigo-600 text-white rounded-full hover:scale-105 transition-transform flex items-center justify-center"
+                className="p-2.5 bg-zinc-700 text-white rounded-full hover:bg-zinc-600 hover:scale-105 transition-all flex items-center justify-center"
               >
                 {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
               </button>
@@ -605,13 +605,13 @@ const App: React.FC = () => {
                   type="range" min="1" max="100" step="1"
                   value={timelineZoom * 10}
                   onChange={(e) => setTimelineZoom(parseInt(e.target.value) / 10)}
-                  className="w-24 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  className="w-24 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-zinc-400"
                 />
                 <span className="text-[10px] text-zinc-500 font-mono w-6">{timelineZoom.toFixed(1)}x</span>
               </div>
               <button 
                 onClick={() => setShowTimeline(!showTimeline)}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${showTimeline ? 'bg-zinc-800 text-zinc-400' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'}`}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${showTimeline ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/30'}`}
               >
                 {showTimeline ? <span>Hide Timeline</span> : <span>Show Timeline</span>}
               </button>
@@ -648,7 +648,7 @@ const App: React.FC = () => {
                 }}
               >
                 <div 
-                  className="h-full bg-indigo-500 transition-all duration-300"
+                  className="h-full bg-zinc-300 transition-all duration-300"
                   style={{ width: `${(currentTime / (project?.duration || 1)) * 100}%` }}
                 />
                 <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100" />
@@ -672,7 +672,7 @@ const App: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <button 
                     onClick={handlePlayExportedVideo}
-                    className="flex-1 flex items-center justify-center space-x-1.5 py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors"
+                    className="flex-1 flex items-center justify-center space-x-1.5 py-1.5 px-3 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg text-xs font-medium transition-colors"
                   >
                     <Play size={12} fill="currentColor" />
                     <span>Play Video</span>

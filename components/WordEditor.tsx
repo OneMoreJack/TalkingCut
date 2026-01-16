@@ -210,7 +210,7 @@ const WordEditor: React.FC<WordEditorProps> = ({
           return lines.map((line, lineIdx) => (
             <p 
               key={lineIdx} 
-              className="text-lg leading-snug text-zinc-300 tracking-normal selection:bg-indigo-500/40 selection:text-white"
+              className="text-lg leading-snug text-zinc-300 tracking-normal selection:bg-zinc-500/40 selection:text-white"
             >
               {line.map((word) => {
                 // Handle silence blocks
@@ -225,7 +225,7 @@ const WordEditor: React.FC<WordEditorProps> = ({
                 const isInSelection = selectionRange && word.start >= selectionRange.start && word.end <= selectionRange.end && !word.deleted;
 
                 const activeStyle = isActive 
-                  ? 'bg-indigo-500/30 text-indigo-200 font-medium' 
+                  ? 'bg-zinc-500/30 text-zinc-200 font-medium' 
                   : '';
                 
                 const inSelectionStyle = isInSelection && !isActive

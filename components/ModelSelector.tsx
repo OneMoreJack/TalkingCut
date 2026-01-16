@@ -110,7 +110,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
             </div>
             <div className="w-full bg-zinc-800 rounded-full h-1 overflow-hidden">
               <div 
-                className="bg-indigo-500 h-full transition-all duration-300" 
+                className="bg-zinc-300 h-full transition-all duration-300" 
                 style={{ width: `${downloadProgress.percent}%` }}
               />
             </div>
@@ -134,7 +134,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                 }}
                 className={`group flex items-center justify-between p-3 cursor-pointer transition-colors ${
                   currentModelId === model.id 
-                  ? 'bg-indigo-50/50' 
+                  ? 'bg-zinc-100/50' 
                   : 'hover:bg-zinc-50'
                 }`}
               >
@@ -186,7 +186,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                         onDownload(model.id);
                         setIsOpen(false);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-indigo-50 text-zinc-400 hover:text-indigo-600 rounded-lg transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 rounded-lg transition-all"
                       title="Download model"
                     >
                       <Download size={14} />

@@ -7,7 +7,7 @@ export const APP_CONFIG = {
 };
 
 export const COLORS = {
-  PRIMARY: '#6366f1', // Indigo 500
+  PRIMARY: '#d4d4d8', // Zinc 300 (neutral white)
   BG_DARK: '#09090b', // Zinc 950
   BG_SURFACE: '#18181b', // Zinc 900
 };
